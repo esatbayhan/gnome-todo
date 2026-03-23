@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Test & coverage
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Tool caches
+.ruff_cache/
+.mypy_cache/
+.pyright/
+
+# Flatpak build artifacts
+build-dir/
+.flatpak-builder/
+
+# Editors
+.idea/
+.vscode/settings.json
+*.swp
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Development-only directories
+specs/
+prompts/

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gresources>
+  <gresource prefix="/dev/bayhan/GnomeTodo">
+    <file preprocess="xml-stripblanks">ui/window.ui</file>
+    <file preprocess="xml-stripblanks">ui/add_task_dialog.ui</file>
+    <file preprocess="xml-stripblanks">ui/welcome_dialog.ui</file>
+    <file preprocess="xml-stripblanks">ui/preferences_dialog.ui</file>
+    <file preprocess="xml-stripblanks">ui/content_header.ui</file>
+    <file preprocess="xml-stripblanks">ui/task_row.ui</file>
+    <file preprocess="xml-stripblanks">ui/task_detail_panel.ui</file>
+    <file preprocess="xml-stripblanks">ui/smart_filter_row.ui</file>
+    <file>style.css</file>
+  </gresource>
+</gresources>

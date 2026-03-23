@@ -1,0 +1,57 @@
+using Gtk 4.0;
+
+template $ContentHeader: Gtk.Box {
+  orientation: vertical;
+  spacing: 4;
+  margin-start: 16;
+  margin-end: 16;
+  margin-top: 12;
+  margin-bottom: 8;
+
+  Gtk.Box {
+    orientation: horizontal;
+    spacing: 8;
+
+    Gtk.Image icon {
+      pixel-size: 24;
+      valign: center;
+      styles ["dim-label"]
+    }
+
+    Gtk.Label title_label {
+      xalign: 0.0;
+      hexpand: true;
+      styles ["title-1"]
+    }
+
+    Gtk.MenuButton grouping_btn {
+      valign: center;
+      tooltip-text: "Group tasks by";
+      styles ["flat"]
+
+      child: Gtk.Box {
+        orientation: horizontal;
+        spacing: 4;
+
+        Gtk.Label grouping_label {
+          label: "Group by Context";
+          styles ["dim-label"]
+        }
+
+        Gtk.Image {
+          icon-name: "pan-down-symbolic";
+          styles ["dim-label"]
+        }
+      };
+    }
+
+    Gtk.Label count_label {
+      styles ["title-1"]
+    }
+  }
+
+  Gtk.Separator {
+    orientation: horizontal;
+    margin-top: 8;
+  }
+}

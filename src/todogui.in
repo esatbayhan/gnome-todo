@@ -1,0 +1,19 @@
+#!@PYTHON@
+
+import os
+import signal
+import sys
+
+pkgdatadir = '@pkgdatadir@'
+
+sys.path.insert(1, pkgdatadir)
+signal.signal(signal.SIGINT, signal.SIG_DFL)
+
+if __name__ == '__main__':
+    from gi.repository import Gio
+
+    resource = Gio.Resource.load(os.path.join(pkgdatadir, 'todogui.gresource'))
+    resource._register()
+
+    from todotxt_gui.app import run
+    sys.exit(run())

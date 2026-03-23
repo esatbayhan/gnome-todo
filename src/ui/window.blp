@@ -1,0 +1,227 @@
+using Gtk 4.0;
+using Adw 1;
+
+menu primary_menu {
+  section {
+    item {
+      label: _("Keyboard Shortcuts");
+      action: "win.show-help-overlay";
+    }
+    item {
+      label: _("Preferences");
+      action: "win.preferences";
+    }
+    item {
+      label: _("About Todo");
+      action: "win.about";
+    }
+  }
+}
+
+template $TodoWindow: Adw.ApplicationWindow {
+  default-width: 1000;
+  default-height: 700;
+  title: "todo.txt";
+
+  Adw.Breakpoint {
+    condition ("max-width: 600sp")
+    setters {
+      split_view.collapsed: true;
+    }
+  }
+
+  Adw.ToastOverlay toast_overlay {
+    Adw.OverlaySplitView split_view {
+      min-sidebar-width: 260;
+      max-sidebar-width: 320;
+      show-sidebar: true;
+
+      notify::show-sidebar => $on_sidebar_visibility_changed();
+
+      [sidebar]
+      Adw.ToolbarView {
+        [top]
+        Adw.HeaderBar {
+          show-title: false;
+
+          [start]
+          Gtk.Button {
+            icon-name: "sidebar-show-symbolic";
+            tooltip-text: "Hide sidebar";
+            clicked => $on_hide_sidebar();
+            styles ["flat"]
+          }
+        }
+
+        Gtk.ScrolledWindow {
+          vexpand: true;
+          hscrollbar-policy: never;
+
+          Gtk.Box {
+            orientation: vertical;
+
+            Gtk.ListBox filter_list {
+              selection-mode: single;
+              margin-start: 8;
+              margin-end: 8;
+              margin-top: 12;
+              margin-bottom: 8;
+              row-selected => $on_filter_selected();
+              styles ["navigation-sidebar"]
+            }
+
+            Gtk.Label {
+              label: "Projects";
+              xalign: 0.0;
+              margin-start: 16;
+              margin-top: 12;
+              margin-bottom: 4;
+              styles ["caption-heading", "dim-label"]
+            }
+
+            Gtk.ListBox project_list {
+              selection-mode: single;
+              margin-start: 8;
+              margin-end: 8;
+              row-selected => $on_project_selected();
+              styles ["navigation-sidebar"]
+            }
+
+            Gtk.Label {
+              label: "Contexts";
+              xalign: 0.0;
+              margin-start: 16;
+              margin-top: 12;
+              margin-bottom: 4;
+              styles ["caption-heading", "dim-label"]
+            }
+
+            Gtk.ListBox context_list {
+              selection-mode: single;
+              margin-start: 8;
+              margin-end: 8;
+              row-selected => $on_context_selected();
+              styles ["navigation-sidebar"]
+            }
+          }
+        }
+      }
+
+      [content]
+      Adw.OverlaySplitView detail_split {
+        sidebar-position: end;
+        collapsed: true;
+        show-sidebar: false;
+        min-sidebar-width: 350;
+        max-sidebar-width: 420;
+
+        [sidebar]
+        Adw.NavigationPage {
+          title: "Details";
+          tag: "detail";
+
+          $TaskDetailPanel detail_panel {}
+        }
+
+        [content]
+        Gtk.Overlay {
+          Adw.ToolbarView {
+            [top]
+            Adw.HeaderBar {
+              [start]
+              Gtk.Button show_sidebar_btn {
+                icon-name: "sidebar-show-symbolic";
+                tooltip-text: "Show sidebar";
+                visible: false;
+                clicked => $on_show_sidebar();
+              }
+
+              [start]
+              Gtk.Button {
+                icon-name: "list-add-symbolic";
+                tooltip-text: "New Task (Ctrl+N)";
+                clicked => $on_new_clicked();
+              }
+
+              [end]
+              Gtk.MenuButton menu_btn {
+                icon-name: "open-menu-symbolic";
+                tooltip-text: "Main Menu";
+                menu-model: primary_menu;
+                primary: true;
+              }
+
+              [end]
+              Gtk.ToggleButton search_btn {
+                icon-name: "system-search-symbolic";
+                tooltip-text: "Search tasks (Ctrl+F)";
+              }
+            }
+
+            [top]
+            Gtk.SearchBar search_bar {
+              Gtk.SearchEntry search_entry {
+                hexpand: true;
+                placeholder-text: "Search tasks…";
+                search-changed => $on_search_changed();
+              }
+            }
+
+            Gtk.Stack content_stack {
+              transition-type: crossfade;
+
+              Gtk.StackPage {
+                name: "empty";
+                child: Adw.StatusPage status_page {
+                  title: "No Tasks";
+                  description: "Press \"+\" to get started.";
+                  icon-name: "checkbox-checked-symbolic";
+                };
+              }
+
+              Gtk.StackPage {
+                name: "content";
+                child: Gtk.ScrolledWindow {
+                  vexpand: true;
+                  hscrollbar-policy: never;
+
+                  Adw.Clamp {
+                    maximum-size: 800;
+                    vexpand: true;
+
+                    Gtk.Box content_box {
+                      orientation: vertical;
+                      margin-start: 8;
+                      margin-end: 8;
+                      margin-bottom: 16;
+
+                      $ContentHeader content_header {}
+
+                      Gtk.Box sections_box {
+                        orientation: vertical;
+                        spacing: 12;
+                        margin-top: 8;
+                      }
+                    }
+                  }
+                };
+              }
+            }
+          }
+
+          [overlay]
+          Gtk.Button {
+            icon-name: "list-add-symbolic";
+            tooltip-text: "New Task (Ctrl+N)";
+            halign: end;
+            valign: end;
+            margin-end: 24;
+            margin-bottom: 24;
+            clicked => $on_new_clicked();
+            styles ["suggested-action", "circular", "fab-button"]
+          }
+        }
+      }
+    }
+  }
+}

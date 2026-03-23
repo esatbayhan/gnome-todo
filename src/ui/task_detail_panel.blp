@@ -1,0 +1,227 @@
+using Gtk 4.0;
+using Adw 1;
+
+template $TaskDetailPanel: Gtk.Box {
+  orientation: vertical;
+
+  Adw.ToolbarView {
+    vexpand: true;
+
+    [top]
+    Adw.HeaderBar {
+      show-title: false;
+
+      [end]
+      Gtk.Button {
+        icon-name: "window-close-symbolic";
+        tooltip-text: "Close";
+        clicked => $on_close_clicked();
+        styles ["flat"]
+      }
+    }
+
+    Gtk.ScrolledWindow {
+      vexpand: true;
+      hscrollbar-policy: never;
+
+      Adw.Clamp {
+        maximum-size: 400;
+
+        Gtk.Box {
+          orientation: vertical;
+          spacing: 16;
+          margin-start: 16;
+          margin-end: 16;
+          margin-top: 12;
+          margin-bottom: 16;
+
+          Adw.PreferencesGroup {
+            title: "Task";
+
+            Adw.EntryRow text_entry {
+              title: "Task text";
+              apply => $on_text_changed();
+            }
+          }
+
+          Adw.PreferencesGroup {
+            title: "Properties";
+
+            Adw.ComboRow priority_combo {
+              title: "Priority";
+
+              model: Gtk.StringList {
+                strings ["None", "A — Highest", "B — High", "C — Medium", "D — Low"]
+              };
+
+              notify::selected => $on_priority_changed();
+            }
+
+            Adw.ActionRow due_row {
+              title: "Due Date";
+              subtitle: "Not set";
+              activatable: false;
+
+              [suffix]
+              Gtk.MenuButton due_date_menu_btn {
+                icon-name: "calendar-today-symbolic";
+                valign: center;
+                styles ["flat"]
+
+                popover: Gtk.Popover {
+                  Gtk.Box {
+                    orientation: vertical;
+                    spacing: 8;
+                    margin-start: 8;
+                    margin-end: 8;
+                    margin-top: 8;
+                    margin-bottom: 8;
+
+                    Gtk.Calendar detail_calendar {
+                      day-selected => $on_due_date_selected();
+                    }
+
+                    Gtk.Button {
+                      label: "Clear date";
+                      clicked => $on_due_date_cleared();
+                      styles ["flat"]
+                    }
+                  }
+                };
+              }
+            }
+
+            Adw.ActionRow scheduled_row {
+              title: "Scheduled";
+              subtitle: "Not set";
+              activatable: false;
+
+              [suffix]
+              Gtk.MenuButton scheduled_menu_btn {
+                icon-name: "calendar-today-symbolic";
+                valign: center;
+                styles ["flat"]
+
+                popover: Gtk.Popover {
+                  Gtk.Box {
+                    orientation: vertical;
+                    spacing: 8;
+                    margin-start: 8;
+                    margin-end: 8;
+                    margin-top: 8;
+                    margin-bottom: 8;
+
+                    Gtk.Calendar scheduled_calendar {
+                      day-selected => $on_scheduled_date_selected();
+                    }
+
+                    Gtk.Button {
+                      label: "Clear date";
+                      clicked => $on_scheduled_date_cleared();
+                      styles ["flat"]
+                    }
+                  }
+                };
+              }
+            }
+
+            Adw.ActionRow starting_row {
+              title: "Starting";
+              subtitle: "Not set";
+              activatable: false;
+
+              [suffix]
+              Gtk.MenuButton starting_menu_btn {
+                icon-name: "calendar-today-symbolic";
+                valign: center;
+                styles ["flat"]
+
+                popover: Gtk.Popover {
+                  Gtk.Box {
+                    orientation: vertical;
+                    spacing: 8;
+                    margin-start: 8;
+                    margin-end: 8;
+                    margin-top: 8;
+                    margin-bottom: 8;
+
+                    Gtk.Calendar starting_calendar {
+                      day-selected => $on_starting_date_selected();
+                    }
+
+                    Gtk.Button {
+                      label: "Clear date";
+                      clicked => $on_starting_date_cleared();
+                      styles ["flat"]
+                    }
+                  }
+                };
+              }
+            }
+
+            Adw.SwitchRow completed_switch {
+              title: "Completed";
+              notify::active => $on_completed_toggled();
+            }
+          }
+
+          Adw.PreferencesGroup {
+            title: "Labels";
+
+            Gtk.FlowBox labels_flow {
+              selection-mode: none;
+              max-children-per-line: 5;
+              min-children-per-line: 1;
+              margin-bottom: 8;
+            }
+
+            Adw.EntryRow label_entry {
+              title: "Add @label";
+              entry-activated => $on_add_context();
+            }
+          }
+
+          Adw.PreferencesGroup {
+            title: "Projects";
+
+            Gtk.FlowBox projects_flow {
+              selection-mode: none;
+              max-children-per-line: 5;
+              min-children-per-line: 1;
+              margin-bottom: 8;
+            }
+
+            Adw.EntryRow project_entry {
+              title: "Add +project";
+              entry-activated => $on_add_project();
+            }
+          }
+
+          Adw.PreferencesGroup {
+            title: "Info";
+
+            Adw.ActionRow created_row {
+              title: "Created";
+              subtitle: "Unknown";
+              activatable: false;
+            }
+
+            Adw.ActionRow completed_date_row {
+              title: "Completed on";
+              subtitle: "N/A";
+              activatable: false;
+            }
+          }
+
+          Gtk.Button {
+            label: "Delete Task";
+            halign: center;
+            margin-top: 8;
+            clicked => $on_delete_clicked();
+            styles ["destructive-action", "pill"]
+          }
+        }
+      }
+    }
+  }
+}

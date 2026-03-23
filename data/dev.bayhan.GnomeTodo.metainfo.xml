@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>dev.bayhan.GnomeTodo</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <name>Todo</name>
+  <summary>Manage your tasks with the todo.txt format</summary>
+
+  <developer id="dev.bayhan">
+    <name>Esat Bayhan</name>
+  </developer>
+
+  <url type="homepage">https://github.com/esatbayhan/gnome-todo</url>
+  <url type="bugtracker">https://github.com/esatbayhan/gnome-todo/issues</url>
+  <url type="vcs-browser">https://github.com/esatbayhan/gnome-todo</url>
+
+  <description>
+    <p>
+      A modern GTK4 application for managing your tasks using the plain-text
+      todo.txt format. Features include priority management, project and context
+      tagging, due dates, and automatic file synchronization support.
+    </p>
+    <p>Features:</p>
+    <ul>
+      <li>Smart filters for Inbox, Today, Scheduled, Starting, and Completed tasks</li>
+      <li>Sidebar with projects and contexts for quick navigation</li>
+      <li>Inline task editing with a detail panel</li>
+      <li>Keyboard-driven workflow with comprehensive shortcuts</li>
+      <li>Automatic detection of external file changes</li>
+      <li>Plain-text storage -- your data is always yours</li>
+    </ul>
+  </description>
+
+  <launchable type="desktop-id">dev.bayhan.GnomeTodo.desktop</launchable>
+
+  <branding>
+    <color type="primary" scheme_preference="light">#99c1f1</color>
+    <color type="primary" scheme_preference="dark">#1a5fb4</color>
+  </branding>
+
+  <!-- TODO: Uncomment after adding screenshots to data/screenshots/
+  <screenshots>
+    <screenshot type="default">
+      <caption>Main task view with sidebar</caption>
+      <image>https://raw.githubusercontent.com/esatbayhan/gnome-todo/main/data/screenshots/light.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Dark mode</caption>
+      <image>https://raw.githubusercontent.com/esatbayhan/gnome-todo/main/data/screenshots/dark.png</image>
+    </screenshot>
+  </screenshots>
+  -->
+
+  <content_rating type="oars-1.1" />
+
+  <releases>
+    <release version="0.1.0" date="2026-03-23">
+      <description>
+        <p>Initial release with core task management features:</p>
+        <ul>
+          <li>Smart filters for Inbox, Today, Scheduled, Starting, and Completed tasks</li>
+          <li>Project and context sidebar navigation</li>
+          <li>Inline task editing with detail panel</li>
+          <li>Automatic external file change detection</li>
+          <li>Keyboard shortcuts for all major actions</li>
+        </ul>
+      </description>
+    </release>
+  </releases>
+
+  <requires>
+    <display_length compare="ge">360</display_length>
+  </requires>
+  <supports>
+    <control>pointing</control>
+    <control>keyboard</control>
+    <control>touch</control>
+  </supports>
+</component>

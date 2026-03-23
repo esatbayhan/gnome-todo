@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=Todo
+Comment=Manage your tasks with the todo.txt format
+Exec=todogui
+Icon=dev.bayhan.GnomeTodo
+Terminal=false
+Type=Application
+Categories=GTK;Utility;ProjectManagement;
+Keywords=todo;task;gtd;productivity;todotxt;
+StartupNotify=true

@@ -1,0 +1,144 @@
+/* todo.txt GUI — minimal custom styles (Adwaita-native) */
+
+/* ── Project circle colors ────────────────────────────────────────────── */
+
+.project-circle {
+    border-radius: 50%;
+    min-width: 20px;
+    min-height: 20px;
+}
+
+.circle-blue    { background-color: @blue_3; }
+.circle-orange  { background-color: @orange_3; }
+.circle-red     { background-color: @red_3; }
+.circle-purple  { background-color: @purple_3; }
+.circle-green   { background-color: @green_3; }
+.circle-teal    { background-color: @blue_2; }
+.circle-pink    { background-color: @red_2; }
+.circle-indigo  { background-color: @purple_4; }
+.circle-brown   { background-color: @orange_5; }
+.circle-mint    { background-color: @green_2; }
+
+/* ── Priority dots ────────────────────────────────────────────────────── */
+
+.priority-dot {
+    border-radius: 50%;
+    min-width: 10px;
+    min-height: 10px;
+}
+
+.priority-A { background-color: @red_3; }
+.priority-B { background-color: @orange_3; }
+.priority-C { background-color: @accent_color; }
+.priority-D { background-color: @dark_3; }
+
+/* ── Due date badges ──────────────────────────────────────────────────── */
+
+.due-badge {
+    border-radius: 6px;
+    padding: 1px 8px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.due-overdue {
+    background-color: alpha(@red_3, 0.15);
+    color: @red_3;
+}
+
+.due-today {
+    background-color: alpha(@accent_color, 0.15);
+    color: @accent_color;
+}
+
+.due-upcoming {
+    background-color: alpha(@dark_3, 0.1);
+    color: @dark_3;
+}
+
+.scheduled {
+    background-color: alpha(@purple_3, 0.15);
+    color: @purple_3;
+}
+
+.starting {
+    background-color: alpha(@green_3, 0.15);
+    color: @green_3;
+}
+
+/* ── Context chips ────────────────────────────────────────────────────── */
+
+.context-chip {
+    border-radius: 10px;
+    padding: 1px 8px;
+    font-size: 11px;
+    font-weight: 500;
+    background-color: alpha(@accent_color, 0.1);
+    color: @accent_color;
+}
+
+/* ── Detail panel chips ───────────────────────────────────────────────── */
+
+.detail-chip {
+    border-radius: 8px;
+    padding: 4px 2px;
+    background-color: alpha(@accent_color, 0.1);
+}
+
+.chip-remove-btn {
+    min-width: 20px;
+    min-height: 20px;
+    padding: 0;
+}
+
+/* ── Suggestion chips (inline autocomplete) ──────────────────────────── */
+
+.suggestion-chip {
+    border-radius: 8px;
+    padding: 4px 8px;
+    font-size: 12px;
+    opacity: 0.55;
+}
+
+.suggestion-chip:hover {
+    opacity: 1;
+}
+
+/* ── FAB (floating action button) ─────────────────────────────────────── */
+
+.fab-button {
+    min-width: 56px;
+    min-height: 56px;
+    border-radius: 50%;
+    box-shadow: 0 2px 8px alpha(black, 0.25);
+}
+
+.fab-button:hover {
+    box-shadow: 0 4px 12px alpha(black, 0.3);
+}
+
+/* ── Drag-and-drop ───────────────────────────────────────────────────── */
+
+.drop-highlight {
+    background-color: alpha(@accent_color, 0.15);
+    border-radius: 8px;
+}
+
+.drag-icon {
+    padding: 8px 12px;
+    background-color: @card_bg_color;
+    border-radius: 8px;
+    font-size: 13px;
+}
+
+/* ── Task delete button hover reveal ──────────────────────────────────── */
+
+.task-delete-btn {
+    opacity: 0;
+    transition: opacity 200ms;
+}
+
+.task-row:hover .task-delete-btn,
+row:hover .task-delete-btn {
+    opacity: 1;
+}

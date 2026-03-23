@@ -1,0 +1,48 @@
+using Gtk 4.0;
+using Adw 1;
+
+template $PreferencesDialog: Adw.Dialog {
+  title: "Preferences";
+  content-width: 480;
+
+  Adw.ToolbarView {
+    [top]
+    Adw.HeaderBar {}
+
+    Gtk.Box {
+      orientation: vertical;
+      spacing: 16;
+      margin-start: 16;
+      margin-end: 16;
+      margin-top: 12;
+      margin-bottom: 16;
+
+      Adw.PreferencesGroup {
+        title: "Storage";
+
+        Adw.ActionRow dir_row {
+          title: "Task folder";
+          subtitle: "Not set";
+
+          [suffix]
+          Gtk.Button {
+            label: "Change…";
+            valign: center;
+            clicked => $on_change_dir();
+            styles ["flat"]
+          }
+        }
+      }
+
+      Adw.PreferencesGroup {
+        title: "Display";
+
+        Adw.SwitchRow raw_text_row {
+          title: "Show raw text";
+          subtitle: "Display the full todo.txt line instead of cleaned text";
+          notify::active => $on_raw_text_toggled();
+        }
+      }
+    }
+  }
+}

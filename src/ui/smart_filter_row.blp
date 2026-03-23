@@ -1,0 +1,27 @@
+using Gtk 4.0;
+
+template $SmartFilterRow: Gtk.ListBoxRow {
+  Gtk.Box {
+    orientation: horizontal;
+    spacing: 10;
+    margin-start: 8;
+    margin-end: 8;
+    margin-top: 6;
+    margin-bottom: 6;
+
+    Gtk.Image icon {
+      pixel-size: 18;
+    }
+
+    Gtk.Label name_label {
+      xalign: 0.0;
+      hexpand: true;
+      ellipsize: end;
+    }
+
+    Gtk.Label count_label {
+      label: "0";
+      styles ["dim-label"]
+    }
+  }
+}
