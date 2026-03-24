@@ -9,8 +9,8 @@ from gi.repository import Gtk
 
 # Smart filter name → icon
 FILTER_ICONS: dict[str, str] = {
-    "Inbox": "mail-inbox-symbolic",
-    "Today": "calendar-today-symbolic",
+    "Inbox": "mail-unread-symbolic",
+    "Today": "x-office-calendar-symbolic",
     "Scheduled": "alarm-symbolic",
     "Starting": "media-playback-start-symbolic",
     "All": "view-list-symbolic",

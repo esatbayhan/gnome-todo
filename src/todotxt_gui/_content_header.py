@@ -10,7 +10,7 @@ gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 from gi.repository import Gio, GLib, Gtk
 
-from ._grouping import GROUPING_MODES
+from todotxt_lib import GROUPING_MODES
 from ._ui import RESOURCE_PREFIX
 
 # Translators: menu item labels for task grouping modes

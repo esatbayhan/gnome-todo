@@ -11,38 +11,46 @@ gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 from gi.repository import Adw, Gdk, Gio, GObject, Gtk
 from todotxt_lib import (
-    Priority,
+    FALLBACK_GROUPS,
+    GROUPING_MODES,
+    MutationOutcome,
+    SelectionKind,
+    SidebarSelection,
     Task,
     TodoFile,
-    add_task,
+    add_tag_to_task,
+    add_task_with_priority,
     all_contexts,
     all_projects,
-    complete_task,
-    delete_task,
-    deprioritize,
-    filter_tasks,
-    replace_task,
-    set_priority,
-    uncomplete_task,
+    build_tag_list,
+    complete_task_by_raw,
+    compute_smart_filter_counts,
+    delete_task_by_raw,
+    find_task_by_raw,
+    group_tasks,
+    uncomplete_task_by_raw,
+    update_task_from_detail,
 )
 
-from ._config import get_show_raw_text
 from . import __version__
+from ._config import get_show_raw_text
 from ._content import TaskSection
-from ._content_header import ContentHeader as ContentHeader
-from ._detail_panel import rebuild_task_line
+from ._content_header import ContentHeader
+from ._detail_panel import TaskDetailPanel
 from ._dialogs import AddTaskDialog, AddTaskResult
 from ._file_monitor import FileMonitor
-from ._grouping import FALLBACK_GROUPS, GROUPING_MODES, group_tasks
 from ._preferences import PreferencesDialog
 from ._shortcuts import FILTER_BY_NUMBER, FILTER_ICONS, build_shortcuts_window
 from ._sidebar import (
     FILTER_DEFS,
     SmartFilterRow,
     TagRow,
-    build_tag_list,
 )
 from ._ui import RESOURCE_PREFIX
+from ._window_state import (
+    build_content_state,
+    smart_filter_row_counts,
+)
 
 
 @Gtk.Template(resource_path=f"{RESOURCE_PREFIX}/ui/window.ui")
@@ -94,7 +102,7 @@ class TodoWindow(Adw.ApplicationWindow):
         self.add_action(about_action)
 
         # Selection state
-        self._selection_kind: str = "smart"  # "smart" or "project"
+        self._selection_kind: SelectionKind = "smart"
         self._selection_value: str = "All"
         self._show_completed_in_list = False
         self._updating_sidebar = False
@@ -200,34 +208,17 @@ class TodoWindow(Adw.ApplicationWindow):
             else:
                 self._selected_task = None
 
-    def _find_task(self, raw: str) -> tuple[Task | None, TodoFile | None]:
-        """Locate a task by its raw line in either backing file."""
-        for t in self._todo.tasks:
-            if t.raw == raw:
-                return t, self._todo
-        for t in self._done_file.tasks:
-            if t.raw == raw:
-                return t, self._done_file
-        return None, None
-
     def _refresh_selected_task(self) -> None:
         """Re-select the open task after an external reload, or close panel."""
         if self._selected_task is None:
             return
-        found = next(
-            (t for t in self._all_tasks() if t.raw == self._selected_task.raw),
-            None,
-        )
-        if found is not None:
-            self._selected_task = found
-            all_task_list = self._all_tasks()
-            self.detail_panel.set_available_tags(
-                all_contexts(all_task_list),
-                all_projects(all_task_list),
-            )
-            self.detail_panel.set_task(found)
-        else:
+        located = find_task_by_raw(self._todo, self._done_file, self._selected_task.raw)
+        if located is None:
             self._close_detail_panel()
+            return
+
+        self._selected_task = located.task
+        self._sync_detail_panel()
 
     # ── Sidebar refresh ─────────────────────────────────────────────────
 
@@ -277,34 +268,9 @@ class TodoWindow(Adw.ApplicationWindow):
 
     def _update_filter_counts(self, tasks: list[Task]) -> None:
         """Recompute counts for all filter rows."""
-        today_str = str(date.today())
-        inbox = 0
-        today = 0
-        scheduled = 0
-        starting = 0
-        all_active = 0
-        completed = 0
-
-        for t in tasks:
-            if t.done:
-                completed += 1
-            else:
-                all_active += 1
-                if len(t.projects) == 0:
-                    inbox += 1
-                if t.keyvalues.get("due") == today_str:
-                    today += 1
-                if "scheduled" in t.keyvalues:
-                    scheduled += 1
-                if "starting" in t.keyvalues:
-                    starting += 1
-
-        self._filter_rows["Inbox"].set_count(inbox)
-        self._filter_rows["Today"].set_count(today)
-        self._filter_rows["Scheduled"].set_count(scheduled)
-        self._filter_rows["Starting"].set_count(starting)
-        self._filter_rows["All"].set_count(all_active)
-        self._filter_rows["Completed"].set_count(completed)
+        counts = compute_smart_filter_counts(tasks, today=date.today())
+        for name, count in smart_filter_row_counts(counts).items():
+            self._filter_rows[name].set_count(count)
 
     def _set_filter_active(self, name: str | None) -> None:
         """Select the filter row matching the given name, deselect if None."""
@@ -336,33 +302,21 @@ class TodoWindow(Adw.ApplicationWindow):
     # ── Content refresh ─────────────────────────────────────────────────
 
     def _refresh_content(self) -> None:
-        tasks = self._get_filtered_tasks()
-        search_text = self.search_entry.get_text().strip().lower()
-        if search_text:
-            tasks = [t for t in tasks if search_text in t.text.lower()]
-
-        active_tasks = [t for t in tasks if not t.done]
-        done_tasks = [t for t in tasks if t.done]
-
-        # For Completed view, show all done tasks
-        if self._selection_value == "Completed" and self._selection_kind == "smart":
-            display_tasks = done_tasks
-        else:
-            display_tasks = active_tasks
-
-        # Determine grouping mode and project label visibility
         mode = GROUPING_MODES[self._grouping_mode]
-        if mode == "project":
-            show_project = False
-        elif self._selection_kind == "project":
-            show_project = False
-        else:
-            show_project = True
+        content_state = build_content_state(
+            self._all_tasks(),
+            selection=self._current_selection(),
+            search_text=self.search_entry.get_text(),
+            grouping_mode=mode,
+            today=date.today(),
+            filter_icons=FILTER_ICONS,
+        )
 
-        # Update header
-        title, icon_name = self._current_title_icon()
-        count = len(display_tasks)
-        self.content_header.update(title, count, icon_name)
+        self.content_header.update(
+            content_state.title,
+            content_state.count,
+            content_state.icon_name,
+        )
 
         # Rebuild sections
         child = self.sections_box.get_first_child()
@@ -371,22 +325,17 @@ class TodoWindow(Adw.ApplicationWindow):
             self.sections_box.remove(child)
             child = next_child
 
-        if not display_tasks and not done_tasks:
-            if search_text:
-                self.status_page.set_title("No Results")
-                self.status_page.set_description("Try a different search term.")
-                self.status_page.set_icon_name("edit-find-symbolic")
-            else:
-                self.status_page.set_title("No Tasks")
-                self.status_page.set_description('Press "+" to get started.')
-                self.status_page.set_icon_name("checkbox-checked-symbolic")
+        if content_state.empty_state is not None:
+            self.status_page.set_title(content_state.empty_state.title)
+            self.status_page.set_description(content_state.empty_state.description)
+            self.status_page.set_icon_name(content_state.empty_state.icon_name)
             self.content_stack.set_visible_child_name("empty")
             return
 
         self.content_stack.set_visible_child_name("content")
 
-        if display_tasks:
-            groups = group_tasks(display_tasks, mode)
+        if content_state.display_tasks:
+            groups = group_tasks(list(content_state.display_tasks), mode)
             single_fallback = len(groups) == 1 and (
                 not groups[0][0] or groups[0][0] in FALLBACK_GROUPS
             )
@@ -397,7 +346,7 @@ class TodoWindow(Adw.ApplicationWindow):
                     self._complete_task,
                     self._delete_task,
                     on_task_selected=self._on_task_selected,
-                    show_project=show_project,
+                    show_project=content_state.show_project,
                     show_raw_text=self._show_raw_text,
                 )
                 self.sections_box.append(section)
@@ -409,69 +358,28 @@ class TodoWindow(Adw.ApplicationWindow):
                         self._complete_task,
                         self._delete_task,
                         on_task_selected=self._on_task_selected,
-                        show_project=show_project,
+                        show_project=content_state.show_project,
                         show_raw_text=self._show_raw_text,
                     )
                     self.sections_box.append(section)
 
         # Completed section at bottom (for non-Completed views)
-        show_completed = done_tasks and not (
-            self._selection_kind == "smart" and self._selection_value == "Completed"
-        )
-        if show_completed:
+        if content_state.show_completed_section:
             completed_section = TaskSection(
-                f"Completed ({len(done_tasks)})",
-                done_tasks,
+                f"Completed ({len(content_state.done_tasks)})",
+                list(content_state.done_tasks),
                 self._complete_task,
                 self._delete_task,
                 on_task_selected=self._on_task_selected,
-                show_project=show_project,
+                show_project=content_state.show_project,
                 show_raw_text=self._show_raw_text,
                 initially_expanded=self._show_completed_in_list,
             )
             self.sections_box.append(completed_section)
 
-    def _get_filtered_tasks(self) -> list[Task]:
-        """Get tasks matching the current sidebar selection."""
-        all_tasks = self._all_tasks()
-        today_str = str(date.today())
-
-        if self._selection_kind == "smart":
-            v = self._selection_value
-            if v == "Inbox":
-                return [t for t in all_tasks if not t.done and len(t.projects) == 0]
-            if v == "Today":
-                return [
-                    t
-                    for t in all_tasks
-                    if not t.done and t.keyvalues.get("due") == today_str
-                ]
-            if v == "Scheduled":
-                return [
-                    t for t in all_tasks if not t.done and "scheduled" in t.keyvalues
-                ]
-            if v == "Starting":
-                return [
-                    t for t in all_tasks if not t.done and "starting" in t.keyvalues
-                ]
-            if v == "All":
-                return [t for t in all_tasks if not t.done]
-            if v == "Completed":
-                return [t for t in all_tasks if t.done]
-        elif self._selection_kind == "project":
-            return filter_tasks(all_tasks, project=self._selection_value)
-        elif self._selection_kind == "context":
-            return filter_tasks(all_tasks, context=self._selection_value)
-        return all_tasks
-
-    def _current_title_icon(self) -> tuple[str, str | None]:
-        """Return (title, icon_name) for the current selection."""
-        if self._selection_kind == "smart":
-            icon = FILTER_ICONS.get(self._selection_value)
-            return self._selection_value, icon
-        if self._selection_kind == "context":
-            return f"@{self._selection_value}", None
-        return self._selection_value, None
+    def _current_selection(self) -> SidebarSelection:
+        """Return the current sidebar selection as a typed value."""
+        return SidebarSelection(kind=self._selection_kind, value=self._selection_value)
 
     def _on_grouping_mode_changed(self, index: int) -> None:
         """Handle grouping dropdown selection change."""
@@ -482,31 +390,36 @@ class TodoWindow(Adw.ApplicationWindow):
 
     def _complete_task(self, task: Task) -> None:
         self._reload_if_changed()
-        fresh, source = self._find_task(task.raw)
-        if fresh is None or source is not self._todo:
+        outcome = complete_task_by_raw(
+            self._todo,
+            self._done_file,
+            task.raw,
+            completion_date=date.today(),
+        )
+        if outcome.status == "missing":
             self._refresh_sidebar()
             self._refresh_content()
             return
-        complete_task(self._todo, fresh, date.today())
-        self._todo.save()
-        self._refresh_sidebar()
-        self._refresh_content()
-        self.toast_overlay.add_toast(Adw.Toast(title="Task completed"))
+
+        self._apply_mutation_outcome(
+            outcome,
+            toast_title="Task completed",
+        )
 
     def _delete_task(self, task: Task) -> None:
         self._reload_if_changed()
-        fresh, source = self._find_task(task.raw)
-        if fresh is None or source is None:
+        outcome = delete_task_by_raw(self._todo, self._done_file, task.raw)
+        if outcome.status == "missing":
             self._close_detail_panel()
             self._refresh_sidebar()
             self._refresh_content()
             return
-        delete_task(source, fresh)
-        source.save()
-        self._close_detail_panel()
-        self._refresh_sidebar()
-        self._refresh_content()
-        self.toast_overlay.add_toast(Adw.Toast(title="Task deleted"))
+
+        self._apply_mutation_outcome(
+            outcome,
+            close_detail=True,
+            toast_title="Task deleted",
+        )
 
     # ── Drag-and-drop onto sidebar tags ────────────────────────────────
 
@@ -518,44 +431,31 @@ class TodoWindow(Adw.ApplicationWindow):
     ) -> None:
         """Add a project or context to a task dropped on a sidebar tag."""
         self._reload_if_changed()
-        task, source_file = self._find_task(task_raw)
-        if task is None or source_file is None:
+        outcome = add_tag_to_task(
+            self._todo,
+            self._done_file,
+            task_raw,
+            tag_name=tag_name,
+            tag_kind=tag_kind,
+        )
+        if outcome.status != "changed":
             return
 
-        # Skip if the task already has this tag
-        if tag_kind == "project" and tag_name in task.projects:
-            return
-        if tag_kind == "context" and tag_name in task.contexts:
-            return
-
-        if tag_kind == "project":
-            new_line = rebuild_task_line(task, add_project=tag_name)
-        else:
-            new_line = rebuild_task_line(task, add_context=tag_name)
-
-        new_task = replace_task(source_file, task, new_line)
-        source_file.save()
-
-        if self._selected_task is not None and self._selected_task.raw == task_raw:
-            self._selected_task = new_task
-            self.detail_panel.set_task(new_task)
-
-        self._refresh_sidebar()
-        self._refresh_content()
         prefix = "+" if tag_kind == "project" else "@"
-        self.toast_overlay.add_toast(Adw.Toast(title=f"Added {prefix}{tag_name}"))
+        self._apply_mutation_outcome(
+            outcome,
+            select_task=(
+                self._selected_task is not None and self._selected_task.raw == task_raw
+            ),
+            toast_title=f"Added {prefix}{tag_name}",
+        )
 
     # ── Detail panel ────────────────────────────────────────────────────
 
     def _on_task_selected(self, task: Task) -> None:
         """Open the detail panel for the selected task."""
         self._selected_task = task
-        all_task_list = self._all_tasks()
-        self.detail_panel.set_available_tags(
-            all_contexts(all_task_list),
-            all_projects(all_task_list),
-        )
-        self.detail_panel.set_task(task)
+        self._sync_detail_panel()
         self.detail_split.set_show_sidebar(True)
 
     def _close_detail_panel(self) -> None:
@@ -565,36 +465,23 @@ class TodoWindow(Adw.ApplicationWindow):
     def _on_detail_task_updated(self, old_task: Task, new_line: str) -> None:
         """Handle task update from the detail panel."""
         self._reload_if_changed()
-        fresh, source = self._find_task(old_task.raw)
-        if fresh is None or source is None:
+        outcome = update_task_from_detail(
+            self._todo,
+            self._done_file,
+            old_task.raw,
+            new_line,
+        )
+        if outcome.status == "missing":
             self._refresh_sidebar()
             self._refresh_content()
             return
+        if outcome.status == "noop":
+            return
 
-        if new_line.startswith("__priority__:"):
-            pri_str = new_line.split(":", 1)[1]
-            if source is not self._todo:
-                return
-            if pri_str:
-                new_task = set_priority(self._todo, fresh, Priority(pri_str))
-            else:
-                new_task = deprioritize(self._todo, fresh)
-            self._todo.save()
-            self._selected_task = new_task
-        else:
-            new_task = replace_task(source, fresh, new_line)
-            source.save()
-            self._selected_task = new_task
-
-        self._refresh_sidebar()
-        self._refresh_content()
-        if self._selected_task is not None:
-            all_task_list = self._all_tasks()
-            self.detail_panel.set_available_tags(
-                all_contexts(all_task_list),
-                all_projects(all_task_list),
-            )
-            self.detail_panel.set_task(self._selected_task)
+        self._apply_mutation_outcome(
+            outcome,
+            select_task=True,
+        )
 
     def _on_detail_task_completed(self, task: Task) -> None:
         self._complete_task(task)
@@ -602,25 +489,18 @@ class TodoWindow(Adw.ApplicationWindow):
 
     def _on_detail_task_uncompleted(self, task: Task) -> None:
         self._reload_if_changed()
-        fresh, source = self._find_task(task.raw)
-        if fresh is None or source is None:
+        outcome = uncomplete_task_by_raw(self._todo, self._done_file, task.raw)
+        if outcome.status == "missing":
             self._close_detail_panel()
             self._refresh_sidebar()
             self._refresh_content()
             return
-        if source is self._done_file:
-            new_task = uncomplete_task(self._done_file, fresh)
-            delete_task(self._done_file, new_task)
-            self._done_file.save()
-            self._todo.tasks.append(new_task)
-            self._todo.save()
-        elif source is self._todo:
-            uncomplete_task(self._todo, fresh)
-            self._todo.save()
-        self._close_detail_panel()
-        self._refresh_sidebar()
-        self._refresh_content()
-        self.toast_overlay.add_toast(Adw.Toast(title="Task uncompleted"))
+
+        self._apply_mutation_outcome(
+            outcome,
+            close_detail=True,
+            toast_title="Task uncompleted",
+        )
 
     def _on_detail_task_deleted(self, task: Task) -> None:
         self._delete_task(task)
@@ -708,13 +588,16 @@ class TodoWindow(Adw.ApplicationWindow):
             if result is None:
                 return
             self._reload_if_changed()
-            new_task = add_task(self._todo, result.text, date.today())
-            if result.priority is not None:
-                set_priority(self._todo, new_task, result.priority)
-            self._todo.save()
-            self._refresh_sidebar()
-            self._refresh_content()
-            self.toast_overlay.add_toast(Adw.Toast(title="Task added"))
+            outcome = add_task_with_priority(
+                self._todo,
+                result.text,
+                creation_date=date.today(),
+                priority=result.priority,
+            )
+            self._apply_mutation_outcome(
+                outcome,
+                toast_title="Task added",
+            )
 
         self._add_dialog.open(
             self,
@@ -790,3 +673,42 @@ class TodoWindow(Adw.ApplicationWindow):
         self._load()
         self._monitor.update_paths([self._todo.path, self._done_file.path])
         self.toast_overlay.add_toast(Adw.Toast(title=f"Switched to {new_dir.name}"))
+
+    def _sync_detail_panel(self) -> None:
+        """Refresh the detail panel for the currently selected task."""
+        if self._selected_task is None:
+            return
+        all_task_list = self._all_tasks()
+        self.detail_panel.set_available_tags(
+            all_contexts(all_task_list),
+            all_projects(all_task_list),
+        )
+        self.detail_panel.set_task(self._selected_task)
+
+    def _apply_mutation_outcome(
+        self,
+        outcome: MutationOutcome,
+        *,
+        select_task: bool = False,
+        close_detail: bool = False,
+        toast_title: str | None = None,
+    ) -> None:
+        """Persist changed files, refresh views, and update selection state."""
+        if outcome.save_todo:
+            self._todo.save()
+        if outcome.save_done:
+            self._done_file.save()
+
+        if close_detail:
+            self._close_detail_panel()
+        elif select_task and outcome.task is not None:
+            self._selected_task = outcome.task
+
+        self._refresh_sidebar()
+        self._refresh_content()
+
+        if select_task and not close_detail and self._selected_task is not None:
+            self._sync_detail_panel()
+
+        if toast_title is not None and outcome.changed:
+            self.toast_overlay.add_toast(Adw.Toast(title=toast_title))

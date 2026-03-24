@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from datetime import date as _date
+from datetime import date
 
-from todotxt_lib import Priority, Task
+from .task import Priority, Task
 
 # ── Constants ────────────────────────────────────────────────────────
 
@@ -72,28 +72,43 @@ def _group_by_tag(
 # ── Date-based grouping ─────────────────────────────────────────────
 
 
-def group_by_due(tasks: list[Task]) -> list[tuple[str, list[Task]]]:
+def group_by_due(
+    tasks: list[Task],
+    *,
+    today: date | None = None,
+) -> list[tuple[str, list[Task]]]:
     """Group tasks by due date: Overdue, Today, future dates, No Due Date."""
-    return _group_by_date_key(tasks, "due", "No Due Date")
+    return _group_by_date_key(tasks, "due", "No Due Date", today=today)
 
 
-def group_by_scheduled(tasks: list[Task]) -> list[tuple[str, list[Task]]]:
+def group_by_scheduled(
+    tasks: list[Task],
+    *,
+    today: date | None = None,
+) -> list[tuple[str, list[Task]]]:
     """Group tasks by scheduled date."""
-    return _group_by_date_key(tasks, "scheduled", "Not Scheduled")
+    return _group_by_date_key(tasks, "scheduled", "Not Scheduled", today=today)
 
 
-def group_by_starting(tasks: list[Task]) -> list[tuple[str, list[Task]]]:
+def group_by_starting(
+    tasks: list[Task],
+    *,
+    today: date | None = None,
+) -> list[tuple[str, list[Task]]]:
     """Group tasks by starting date."""
-    return _group_by_date_key(tasks, "starting", "No Start Date")
+    return _group_by_date_key(tasks, "starting", "No Start Date", today=today)
 
 
 def _group_by_date_key(
     tasks: list[Task],
     key: str,
     fallback_label: str,
+    *,
+    today: date | None = None,
 ) -> list[tuple[str, list[Task]]]:
     """Generic date grouping: Overdue, Today, upcoming dates, then fallback."""
-    today = _date.today()
+    if today is None:
+        today = date.today()
 
     overdue: list[Task] = []
     today_tasks: list[Task] = []
@@ -106,7 +121,7 @@ def _group_by_date_key(
             no_date.append(task)
             continue
         try:
-            d = _date.fromisoformat(date_str)
+            d = date.fromisoformat(date_str)
         except ValueError:
             no_date.append(task)
             continue

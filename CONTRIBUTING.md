@@ -2,6 +2,8 @@
 
 Contributions are welcome! Here's how to get started.
 
+Project policy: target GNOME on Wayland only. Do not add or document X11 session support.
+
 ## Prerequisites
 
 - `flatpak`
@@ -12,16 +14,21 @@ instructions per distribution.
 
 ## Building
 
-Clone the repository and run the Flatpak build script:
+Clone the repository and run the combined installer:
 
 ```bash
 git clone https://github.com/esatbayhan/gnome-todo.git
 cd gnome-todo
-./run-flatpak.sh
+./install.sh
 ```
 
-This installs the GNOME SDK/runtime if needed, builds the app, and installs it
-as a user Flatpak.
+This installs the GNOME SDK/runtime if needed, builds the app, installs it as a
+user Flatpak, and installs/enables the GNOME Shell extension.
+
+For app-only rebuilds, use `./install-flatpak.sh`.
+For extension-only updates, use `./install-extension.sh`.
+For faster extension iterations without logging out each time, use
+`./install-extension.sh --reload` and watch errors with `./watch-extension.sh`.
 
 ## Running tests
 

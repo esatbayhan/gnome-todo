@@ -27,6 +27,4 @@ build-dir/
 .DS_Store
 Thumbs.db
 
-# Development-only directories
 specs/
-prompts/

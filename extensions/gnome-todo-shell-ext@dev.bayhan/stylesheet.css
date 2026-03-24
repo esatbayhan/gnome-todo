@@ -1,0 +1,68 @@
+.todo-panel-entry-box {
+  width: 360px;
+}
+
+.todo-panel-entry {
+  padding: 8px 10px;
+}
+
+.todo-panel-status {
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.todo-panel-status.success {
+  color: #8ec07c;
+}
+
+.todo-panel-status.error {
+  color: #fb8072;
+}
+
+.todo-panel-status.loading,
+.todo-panel-status.empty,
+.todo-panel-status.missing-config,
+.todo-panel-status.missing-app {
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.todo-panel-task-item {
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+
+.todo-panel-task-title {
+  font-weight: 600;
+}
+
+.todo-panel-meta-box {
+  spacing: 6px;
+  margin-top: 6px;
+}
+
+.todo-panel-badge {
+  padding: 2px 6px;
+  border-radius: 999px;
+  background-color: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.86em;
+}
+
+.todo-panel-priority {
+  background-color: rgba(251, 128, 114, 0.22);
+}
+
+.todo-panel-scheduled {
+  background-color: rgba(128, 177, 211, 0.22);
+}
+
+.todo-panel-context {
+  background-color: rgba(141, 182, 0, 0.22);
+}
+
+.todo-panel-project {
+  background-color: rgba(255, 193, 7, 0.22);
+}
+
+.todo-panel-keyvalue {
+  background-color: rgba(110, 168, 254, 0.18);
+}

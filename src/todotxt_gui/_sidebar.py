@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import Literal
 
 import gi
 
@@ -10,28 +11,14 @@ gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 gi.require_version("Pango", "1.0")
 from gi.repository import Gdk, GObject, Gtk, Pango
-from todotxt_lib import Task
 
+from todotxt_lib import build_tag_list
+
+from ._sidebar_state import project_color
 from ._ui import RESOURCE_PREFIX
 
-# Color palette for project circles (CSS class suffixes)
-_PALETTE = [
-    "blue",
-    "orange",
-    "red",
-    "purple",
-    "green",
-    "teal",
-    "pink",
-    "indigo",
-    "brown",
-    "mint",
-]
-
-
-def project_color(name: str) -> str:
-    """Deterministic color from the palette based on project name."""
-    return _PALETTE[hash(name) % len(_PALETTE)]
+TagKind = Literal["project", "context"]
+TaskDroppedHandler = Callable[[str, str, TagKind], None]
 
 
 # ── Smart filter list rows ─────────────────────────────────────────────
@@ -39,8 +26,8 @@ def project_color(name: str) -> str:
 
 # (name, icon_name)
 FILTER_DEFS: list[tuple[str, str]] = [
-    ("Inbox", "mail-inbox-symbolic"),
-    ("Today", "calendar-today-symbolic"),
+    ("Inbox", "mail-unread-symbolic"),
+    ("Today", "x-office-calendar-symbolic"),
     ("Scheduled", "alarm-symbolic"),
     ("Starting", "media-playback-start-symbolic"),
     ("All", "view-list-symbolic"),
@@ -79,8 +66,8 @@ class TagRow(Gtk.ListBoxRow):
         tag_name: str,
         count: int,
         *,
-        tag_kind: str = "project",
-        on_task_dropped: Callable[[str, str, str], None] | None = None,
+        tag_kind: TagKind = "project",
+        on_task_dropped: TaskDroppedHandler | None = None,
     ) -> None:
         super().__init__()
         self.tag_name = tag_name
@@ -150,24 +137,3 @@ class TagRow(Gtk.ListBoxRow):
 
     def set_count(self, count: int) -> None:
         self._count_label.set_label(str(count))
-
-
-def build_tag_list(
-    tasks: list[Task],
-    attr: str,
-) -> list[tuple[str, int]]:
-    """Return sorted (tag_name, active_count) pairs.
-
-    *attr* is the Task attribute to read — ``"projects"`` or ``"contexts"``.
-    """
-    counts: dict[str, int] = {}
-    for t in tasks:
-        if not t.done:
-            for tag in getattr(t, attr):
-                counts[tag] = counts.get(tag, 0) + 1
-    # Include tags that only appear in done tasks (with 0 count)
-    for t in tasks:
-        for tag in getattr(t, attr):
-            if tag not in counts:
-                counts[tag] = 0
-    return sorted(counts.items())

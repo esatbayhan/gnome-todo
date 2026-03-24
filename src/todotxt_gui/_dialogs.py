@@ -10,8 +10,7 @@ import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 from gi.repository import Adw, Gtk
-from todotxt_lib import Priority
-
+from todotxt_lib import Priority, append_missing_task_metadata
 from ._ui import RESOURCE_PREFIX
 from ._widgets import (
     context_chip,
@@ -56,7 +55,6 @@ class AddTaskDialog(Adw.Dialog):
     def __init__(self) -> None:
         super().__init__()
         self._callback: Callable[[AddTaskResult | None], None] | None = None
-        self._project: str | None = None
         self._due_date: str | None = None
         self._scheduled_date: str | None = None
         self._starting_date: str | None = None
@@ -134,19 +132,11 @@ class AddTaskDialog(Adw.Dialog):
 
     @Gtk.Template.Callback()
     def on_context_entry_activated(self, entry: Adw.EntryRow) -> None:
-        text = entry.get_text().strip().lstrip("@")
-        if text and text not in self._contexts:
-            self._contexts.append(text)
-            entry.set_text("")
-            self._refresh_preview()
+        self._add_tag_from_entry(entry, self._contexts, "@")
 
     @Gtk.Template.Callback()
     def on_project_entry_activated(self, entry: Adw.EntryRow) -> None:
-        text = entry.get_text().strip().lstrip("+")
-        if text and text not in self._projects:
-            self._projects.append(text)
-            entry.set_text("")
-            self._refresh_preview()
+        self._add_tag_from_entry(entry, self._projects, "+")
 
     @Gtk.Template.Callback()
     def on_confirm(self, *_args: object) -> None:
@@ -155,28 +145,15 @@ class AddTaskDialog(Adw.Dialog):
             self._finish(None)
             return
 
-        # Append metadata to text
-        parts = [text]
-        for ctx in self._contexts:
-            tag = f"@{ctx}"
-            if tag not in text:
-                parts.append(tag)
-        for proj in self._projects:
-            tag = f"+{proj}"
-            if tag not in text:
-                parts.append(tag)
-        if self._due_date:
-            if f"due:{self._due_date}" not in text:
-                parts.append(f"due:{self._due_date}")
-        if self._scheduled_date:
-            if f"scheduled:{self._scheduled_date}" not in text:
-                parts.append(f"scheduled:{self._scheduled_date}")
-        if self._starting_date:
-            if f"starting:{self._starting_date}" not in text:
-                parts.append(f"starting:{self._starting_date}")
-
         result = AddTaskResult(
-            text=" ".join(parts),
+            text=append_missing_task_metadata(
+                text,
+                contexts=self._contexts,
+                projects=self._projects,
+                due=self._due_date,
+                scheduled=self._scheduled_date,
+                starting=self._starting_date,
+            ),
             priority=self._priority,
         )
         self._finish(result)
@@ -189,51 +166,29 @@ class AddTaskDialog(Adw.Dialog):
 
     def _rebuild_context_popover(self) -> None:
         """Rebuild the context popover with current available contexts."""
-        self.context_listbox.remove_all()
-
-        if not self._all_contexts:
-            self.context_listbox.set_visible(False)
-            return
-
-        self.context_listbox.set_visible(True)
-        for ctx in self._all_contexts:
-            check = Gtk.CheckButton(label=f"@{ctx}")
-            check.set_active(ctx in self._contexts)
-            check.connect("toggled", self._on_context_toggled, ctx)
-            self.context_listbox.append(check)
+        self._rebuild_tag_popover(
+            self.context_listbox,
+            self._all_contexts,
+            self._contexts,
+            "@",
+            self._on_context_toggled,
+        )
 
     def _on_context_toggled(self, btn: Gtk.CheckButton, ctx: str) -> None:
-        if btn.get_active():
-            if ctx not in self._contexts:
-                self._contexts.append(ctx)
-        else:
-            if ctx in self._contexts:
-                self._contexts.remove(ctx)
-        self._refresh_preview()
+        self._toggle_tag_selection(self._contexts, ctx, btn.get_active())
 
     def _rebuild_project_popover(self) -> None:
         """Rebuild the project popover with current available projects."""
-        self.project_listbox.remove_all()
-
-        if not self._all_projects:
-            self.project_listbox.set_visible(False)
-            return
-
-        self.project_listbox.set_visible(True)
-        for proj in self._all_projects:
-            check = Gtk.CheckButton(label=f"+{proj}")
-            check.set_active(proj in self._projects)
-            check.connect("toggled", self._on_project_toggled, proj)
-            self.project_listbox.append(check)
+        self._rebuild_tag_popover(
+            self.project_listbox,
+            self._all_projects,
+            self._projects,
+            "+",
+            self._on_project_toggled,
+        )
 
     def _on_project_toggled(self, btn: Gtk.CheckButton, proj: str) -> None:
-        if btn.get_active():
-            if proj not in self._projects:
-                self._projects.append(proj)
-        else:
-            if proj in self._projects:
-                self._projects.remove(proj)
-        self._refresh_preview()
+        self._toggle_tag_selection(self._projects, proj, btn.get_active())
 
     # ── Preview row ──────────────────────────────────────────────────────
 
@@ -275,7 +230,6 @@ class AddTaskDialog(Adw.Dialog):
         all_projects: list[str] | None = None,
     ) -> None:
         self._callback = callback
-        self._project = project
         self.entry_row.set_text("")
         self._due_date = None
         self._scheduled_date = None
@@ -299,3 +253,49 @@ class AddTaskDialog(Adw.Dialog):
         if self._callback is not None:
             self._callback(result)
         self.close()
+
+    def _add_tag_from_entry(
+        self,
+        entry: Adw.EntryRow,
+        target: list[str],
+        prefix: str,
+    ) -> None:
+        text = entry.get_text().strip().lstrip(prefix)
+        if not text or text in target:
+            return
+        target.append(text)
+        entry.set_text("")
+        self._refresh_preview()
+
+    def _toggle_tag_selection(
+        self,
+        target: list[str],
+        item: str,
+        is_active: bool,
+    ) -> None:
+        if is_active:
+            if item not in target:
+                target.append(item)
+        elif item in target:
+            target.remove(item)
+        self._refresh_preview()
+
+    def _rebuild_tag_popover(
+        self,
+        listbox: Gtk.ListBox,
+        available: list[str],
+        selected: list[str],
+        prefix: str,
+        on_toggled: Callable[[Gtk.CheckButton, str], None],
+    ) -> None:
+        listbox.remove_all()
+        if not available:
+            listbox.set_visible(False)
+            return
+
+        listbox.set_visible(True)
+        for item in available:
+            check = Gtk.CheckButton(label=f"{prefix}{item}")
+            check.set_active(item in selected)
+            check.connect("toggled", on_toggled, item)
+            listbox.append(check)

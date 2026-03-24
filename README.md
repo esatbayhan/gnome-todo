@@ -6,6 +6,8 @@
 
 A GTK4/libadwaita desktop application for managing todo.txt files.
 
+This project targets GNOME on Wayland. X11 sessions are not supported.
+
 > **Note:** This project is entirely vibe-coded (built with AI assistance).
 > Because of that, it won't be published on Flathub — at least for now.
 
@@ -21,21 +23,47 @@ The gallery images are committed as static README assets.
 
 ## Installation
 
-The recommended way to install is via Flatpak. Clone the repo and run the
-install script:
+The recommended way to install is to install both the Flatpak app and the
+GNOME Shell extension together:
 
 ```bash
 git clone https://github.com/esatbayhan/gnome-todo.git
 cd gnome-todo
-./run-flatpak.sh
+./install.sh
 ```
 
-This will install the GNOME SDK/runtime if needed, build the app, and install
-it as a user Flatpak. You can then launch it from your application menu or via:
+This installs the GNOME SDK/runtime if needed, builds the app, installs it as a
+user Flatpak, and installs/enables the GNOME Shell extension.
+
+If you only want the app, run:
+
+```bash
+./install-flatpak.sh
+```
+
+If you only want to install or update the extension, run:
+
+```bash
+./install-extension.sh
+```
+
+For quicker extension development iterations, run:
+
+```bash
+./install-extension.sh --reload
+./watch-extension.sh
+```
+
+You can then launch the app from your application menu or via:
 
 ```bash
 flatpak run dev.bayhan.GnomeTodo
 ```
+
+For day-to-day local rebuilds, `./install-flatpak.sh` reinstalls the app from
+the current project sources while reusing cached dependency downloads. If you
+want to refresh pinned sources such as `blueprint-compiler`, run
+`./install-flatpak.sh --refresh-sources` or `./install.sh --refresh-sources`.
 
 ### Requirements for building
 
@@ -59,6 +87,10 @@ On Arch:
 ```bash
 sudo pacman -S flatpak flatpak-builder
 ```
+
+When adding or changing UI icon names, choose themed icons that exist in the
+target Flatpak runtime (`org.gnome.Platform//49`), rather than assuming the
+host distro theme provides the same set.
 
 ## Configuration
 
@@ -99,7 +131,7 @@ file, with optional priorities, dates, projects (`+project`), and contexts
 ```
 meson.build                 Root Meson build definition
 dev.bayhan.GnomeTodo.json   Flatpak manifest
-run-flatpak.sh              One-command Flatpak build & install script
+install-flatpak.sh          One-command Flatpak build & install script
 
 data/
     dev.bayhan.GnomeTodo.desktop      Desktop entry

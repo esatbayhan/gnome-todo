@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import html
-import re
 from collections.abc import Callable
 
 import gi
@@ -13,6 +11,7 @@ gi.require_version("Adw", "1")
 from gi.repository import Gdk, GObject, Gtk
 from todotxt_lib import Task
 
+from ._task_row_state import build_task_row_display
 from ._ui import RESOURCE_PREFIX
 from ._widgets import (
     context_chip,
@@ -22,19 +21,6 @@ from ._widgets import (
     scheduled_badge,
     starting_badge,
 )
-
-# Patterns for stripping metadata tokens from display text
-_STRIP_PROJECT_RE = re.compile(r"(?:^|\s)\+\S+")
-_STRIP_CONTEXT_RE = re.compile(r"(?:^|\s)@\S+")
-_STRIP_KEYVALUE_RE = re.compile(r"(?:^|\s)[a-z]+:[^/\s:][^\s:]*")
-
-
-def _clean_task_text(text: str) -> str:
-    """Strip @contexts, +projects, and key:value pairs from task text."""
-    cleaned = _STRIP_KEYVALUE_RE.sub("", text)
-    cleaned = _STRIP_PROJECT_RE.sub("", cleaned)
-    cleaned = _STRIP_CONTEXT_RE.sub("", cleaned)
-    return " ".join(cleaned.split())
 
 
 @Gtk.Template(resource_path=f"{RESOURCE_PREFIX}/ui/task_row.ui")
@@ -80,65 +66,38 @@ class TaskRow(Gtk.ListBoxRow):
         if not self.task.done:
             self.check.connect("toggled", self._on_checked)
 
-        # Task text
-        display_text = (
-            self.task.text if self._show_raw_text else _clean_task_text(self.task.text)
+        display = build_task_row_display(
+            self.task,
+            show_project=self._show_project,
+            show_raw_text=self._show_raw_text,
         )
-        escaped = html.escape(display_text)
-        if self.task.done:
-            self.text_label.set_markup(f"<s>{escaped}</s>")
+        self.text_label.set_label(display.label_text)
+        self.text_label.set_use_markup(display.use_markup)
+        if display.dimmed:
             self.text_label.add_css_class("dim-label")
-        else:
-            self.text_label.set_label(escaped)
-            self.text_label.set_use_markup(True)
 
-        # Metadata row (only for active tasks with metadata)
-        if not self.task.done:
-            self._populate_metadata()
-
-    def _populate_metadata(self) -> None:
-        """Populate the metadata row with priority dot, due badge, context chips."""
-        has_priority = self.task.priority is not None
-        has_due = "due" in self.task.keyvalues
-        has_scheduled = "scheduled" in self.task.keyvalues
-        has_starting = "starting" in self.task.keyvalues
-        has_contexts = len(self.task.contexts) > 0
-        has_projects = self._show_project and len(self.task.projects) > 0
-
-        if not (
-            has_priority
-            or has_due
-            or has_scheduled
-            or has_starting
-            or has_contexts
-            or has_projects
-        ):
+        if display.metadata is None:
             return
 
         self.meta_box.set_visible(True)
 
-        if has_priority and self.task.priority is not None:
-            self.meta_box.append(priority_dot(self.task.priority))
+        if display.metadata.priority is not None:
+            self.meta_box.append(priority_dot(display.metadata.priority))
 
-        if has_due:
-            self.meta_box.append(due_date_badge(self.task.keyvalues["due"]))
+        if display.metadata.due is not None:
+            self.meta_box.append(due_date_badge(display.metadata.due))
 
-        if has_scheduled:
-            self.meta_box.append(
-                scheduled_badge(self.task.keyvalues["scheduled"]),
-            )
+        if display.metadata.scheduled is not None:
+            self.meta_box.append(scheduled_badge(display.metadata.scheduled))
 
-        if has_starting:
-            self.meta_box.append(
-                starting_badge(self.task.keyvalues["starting"]),
-            )
+        if display.metadata.starting is not None:
+            self.meta_box.append(starting_badge(display.metadata.starting))
 
-        for ctx in self.task.contexts[:3]:
+        for ctx in display.metadata.contexts:
             self.meta_box.append(context_chip(ctx))
 
-        if has_projects:
-            for proj in self.task.projects[:2]:
-                self.meta_box.append(project_label(proj))
+        for proj in display.metadata.projects:
+            self.meta_box.append(project_label(proj))
 
     def _on_drag_prepare(
         self,

@@ -1,0 +1,14 @@
+#!@PYTHON@
+
+import signal
+import sys
+
+pkgdatadir = '@pkgdatadir@'
+
+sys.path.insert(1, pkgdatadir)
+signal.signal(signal.SIGINT, signal.SIG_DFL)
+
+if __name__ == '__main__':
+    from todotxt_gui.panel_cli import run
+
+    sys.exit(run())

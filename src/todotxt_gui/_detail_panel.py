@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import enum
-import re
 from collections.abc import Callable
 
 import gi
@@ -11,78 +9,18 @@ import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 from gi.repository import Adw, Gtk
-from todotxt_lib import Priority, Task
+from todotxt_lib import (
+    Priority,
+    Task,
+    build_tag_flow_state,
+    normalize_tag_input,
+    rebuild_task_line,
+)
+
+from ._detail_panel_tags import rebuild_tag_flow
 
 from ._ui import RESOURCE_PREFIX
 
-
-class _Unset(enum.Enum):
-    """Sentinel to distinguish 'not provided' from None."""
-
-    TOKEN = 0
-
-
-_UNSET = _Unset.TOKEN
-
-
-def rebuild_task_line(
-    task: Task,
-    *,
-    new_text: str | None = None,
-    due: str | None | _Unset = _UNSET,
-    scheduled: str | None | _Unset = _UNSET,
-    starting: str | None | _Unset = _UNSET,
-    add_context: str | None = None,
-    remove_context: str | None = None,
-    add_project: str | None = None,
-    remove_project: str | None = None,
-) -> str:
-    """Reconstruct the task text portion with modifications.
-
-    Returns just the text part (no done marker, priority, or dates prefix).
-    The caller uses replace_task() which re-parses the full line.
-    """
-    text = new_text if new_text is not None else task.text
-
-    # Remove a context
-    if remove_context:
-        text = re.sub(rf"\s*@{re.escape(remove_context)}\b", "", text)
-
-    # Add a context
-    if add_context and f"@{add_context}" not in text:
-        text = f"{text} @{add_context}"
-
-    # Remove a project
-    if remove_project:
-        text = re.sub(rf"\s*\+{re.escape(remove_project)}\b", "", text)
-
-    # Add a project
-    if add_project and f"+{add_project}" not in text:
-        text = f"{text} +{add_project}"
-
-    # Handle due date
-    if not isinstance(due, _Unset):
-        text = re.sub(r"\s*due:\S+", "", text)
-        if due is not None:
-            text = f"{text} due:{due}"
-
-    # Handle scheduled date
-    if not isinstance(scheduled, _Unset):
-        text = re.sub(r"\s*scheduled:\S+", "", text)
-        if scheduled is not None:
-            text = f"{text} scheduled:{scheduled}"
-
-    # Handle starting date
-    if not isinstance(starting, _Unset):
-        text = re.sub(r"\s*starting:\S+", "", text)
-        if starting is not None:
-            text = f"{text} starting:{starting}"
-
-    return text.strip()
-
-
-# Priority labels for the combo row
-_PRIORITY_LABELS = ["None", "A — Highest", "B — High", "C — Medium", "D — Low"]
 _PRIORITY_VALUES: list[Priority | None] = [
     None,
     Priority.A,
@@ -196,30 +134,10 @@ class TaskDetailPanel(Gtk.Box):
             self.completed_switch.set_active(task.done)
 
             # Labels (contexts)
-            self._rebuild_chips(
-                self.labels_flow,
-                task.contexts,
-                self._on_remove_context,
-            )
-            self._add_suggestions(
-                self.labels_flow,
-                self._all_contexts,
-                task.contexts,
-                self._on_add_context_suggestion,
-            )
+            self._refresh_context_flow()
 
             # Projects
-            self._rebuild_chips(
-                self.projects_flow,
-                task.projects,
-                self._on_remove_project,
-            )
-            self._add_suggestions(
-                self.projects_flow,
-                self._all_projects,
-                task.projects,
-                self._on_add_project_suggestion,
-            )
+            self._refresh_project_flow()
 
             # Info
             if task.creation_date:
@@ -235,37 +153,6 @@ class TaskDetailPanel(Gtk.Box):
                 self.completed_date_row.set_visible(task.done)
         finally:
             self._updating = False
-
-    def _rebuild_chips(
-        self,
-        flow: Gtk.FlowBox,
-        items: tuple[str, ...],
-        on_remove: Callable[[str], None],
-    ) -> None:
-        """Rebuild a flow box with removable chip buttons."""
-        # Remove all children
-        while True:
-            child = flow.get_child_at_index(0)
-            if child is None:
-                break
-            flow.remove(child)
-
-        for item in items:
-            chip_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
-            chip_box.add_css_class("detail-chip")
-
-            remove_btn = Gtk.Button(icon_name="window-close-symbolic")
-            remove_btn.add_css_class("flat")
-            remove_btn.add_css_class("circular")
-            remove_btn.add_css_class("chip-remove-btn")
-            remove_btn.connect("clicked", self._make_remove_handler(on_remove, item))
-            chip_box.append(remove_btn)
-
-            label = Gtk.Label(label=item)
-            # label.set_margin_end(20)
-            chip_box.append(label)
-
-            flow.append(chip_box)
 
     # ── Template callbacks ───────────────────────────────────────────────
 
@@ -356,25 +243,19 @@ class TaskDetailPanel(Gtk.Box):
 
     @Gtk.Template.Callback()
     def on_add_context(self, entry: Adw.EntryRow) -> None:
-        if self._task is None or self._on_task_updated is None:
-            return
-        text = entry.get_text().strip().lstrip("@")
+        text = normalize_tag_input(entry.get_text(), "@")
         if not text:
             return
         entry.set_text("")
-        new_line = rebuild_task_line(self._task, add_context=text)
-        self._on_task_updated(self._task, new_line)
+        self._emit_task_update(add_context=text)
 
     @Gtk.Template.Callback()
     def on_add_project(self, entry: Adw.EntryRow) -> None:
-        if self._task is None or self._on_task_updated is None:
-            return
-        text = entry.get_text().strip().lstrip("+")
+        text = normalize_tag_input(entry.get_text(), "+")
         if not text:
             return
         entry.set_text("")
-        new_line = rebuild_task_line(self._task, add_project=text)
-        self._on_task_updated(self._task, new_line)
+        self._emit_task_update(add_project=text)
 
     @Gtk.Template.Callback()
     def on_delete_clicked(self, _btn: object) -> None:
@@ -387,101 +268,65 @@ class TaskDetailPanel(Gtk.Box):
             self._on_close()
 
     def _on_remove_context(self, ctx: str) -> None:
-        if self._task is None or self._on_task_updated is None:
-            return
-        new_line = rebuild_task_line(self._task, remove_context=ctx)
-        self._on_task_updated(self._task, new_line)
+        self._emit_task_update(remove_context=ctx)
 
     def _on_remove_project(self, proj: str) -> None:
-        if self._task is None or self._on_task_updated is None:
-            return
-        new_line = rebuild_task_line(self._task, remove_project=proj)
-        self._on_task_updated(self._task, new_line)
-
-    @staticmethod
-    def _make_remove_handler(
-        on_remove: Callable[[str], None], item: str
-    ) -> Callable[[object], None]:
-        def handler(_btn: object) -> None:
-            on_remove(item)
-
-        return handler
+        self._emit_task_update(remove_project=proj)
 
     # ── Inline suggestion chips ────────────────────────────────────────
-
-    def _add_suggestions(
-        self,
-        flow: Gtk.FlowBox,
-        all_items: list[str],
-        current_items: tuple[str, ...],
-        on_click: Callable[[str], None],
-        filter_text: str = "",
-    ) -> None:
-        """Append suggestion chips for unused tags to a flow box."""
-        available = [
-            item
-            for item in all_items
-            if item not in current_items
-            and (not filter_text or filter_text in item.lower())
-        ]
-        for item in available[:8]:
-            btn = Gtk.Button(label=item)
-            btn.add_css_class("suggestion-chip")
-            btn.add_css_class("flat")
-            btn.connect("clicked", self._make_remove_handler(on_click, item))
-            flow.append(btn)
-
-    def _clear_suggestions(self, flow: Gtk.FlowBox) -> None:
-        """Remove only suggestion chips from a flow box."""
-        to_remove: list[Gtk.Widget] = []
-        idx = 0
-        while True:
-            child = flow.get_child_at_index(idx)
-            if child is None:
-                break
-            inner = child.get_child()
-            if inner is not None and inner.has_css_class("suggestion-chip"):
-                to_remove.append(child)
-            idx += 1
-        for child in to_remove:
-            flow.remove(child)
 
     def _on_label_text_changed(self, entry: Adw.EntryRow) -> None:
         if self._updating or self._task is None:
             return
-        text = entry.get_text().strip().lstrip("@").lower()
-        self._clear_suggestions(self.labels_flow)
-        self._add_suggestions(
-            self.labels_flow,
-            self._all_contexts,
-            self._task.contexts,
-            self._on_add_context_suggestion,
-            filter_text=text,
+        self._refresh_context_flow(
+            filter_text=normalize_tag_input(entry.get_text(), "@").lower()
         )
 
     def _on_project_text_changed(self, entry: Adw.EntryRow) -> None:
         if self._updating or self._task is None:
             return
-        text = entry.get_text().strip().lstrip("+").lower()
-        self._clear_suggestions(self.projects_flow)
-        self._add_suggestions(
-            self.projects_flow,
-            self._all_projects,
-            self._task.projects,
-            self._on_add_project_suggestion,
-            filter_text=text,
+        self._refresh_project_flow(
+            filter_text=normalize_tag_input(entry.get_text(), "+").lower()
         )
 
     def _on_add_context_suggestion(self, ctx: str) -> None:
-        if self._task is None or self._on_task_updated is None:
-            return
         self.label_entry.set_text("")
-        new_line = rebuild_task_line(self._task, add_context=ctx)
-        self._on_task_updated(self._task, new_line)
+        self._emit_task_update(add_context=ctx)
 
     def _on_add_project_suggestion(self, proj: str) -> None:
+        self.project_entry.set_text("")
+        self._emit_task_update(add_project=proj)
+
+    def _refresh_context_flow(self, *, filter_text: str = "") -> None:
+        if self._task is None:
+            return
+        rebuild_tag_flow(
+            self.labels_flow,
+            build_tag_flow_state(
+                self._all_contexts,
+                self._task.contexts,
+                filter_text=filter_text,
+            ),
+            on_remove=self._on_remove_context,
+            on_add=self._on_add_context_suggestion,
+        )
+
+    def _refresh_project_flow(self, *, filter_text: str = "") -> None:
+        if self._task is None:
+            return
+        rebuild_tag_flow(
+            self.projects_flow,
+            build_tag_flow_state(
+                self._all_projects,
+                self._task.projects,
+                filter_text=filter_text,
+            ),
+            on_remove=self._on_remove_project,
+            on_add=self._on_add_project_suggestion,
+        )
+
+    def _emit_task_update(self, **changes: str | None) -> None:
         if self._task is None or self._on_task_updated is None:
             return
-        self.project_entry.set_text("")
-        new_line = rebuild_task_line(self._task, add_project=proj)
+        new_line = rebuild_task_line(self._task, **changes)
         self._on_task_updated(self._task, new_line)

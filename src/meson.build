@@ -49,6 +49,15 @@ configure_file(
   install_mode: 'rwxr-xr-x',
 )
 
+configure_file(
+  input: 'todogui-panel.in',
+  output: 'todogui-panel',
+  configuration: conf,
+  install: true,
+  install_dir: get_option('bindir'),
+  install_mode: 'rwxr-xr-x',
+)
+
 # Install todotxt_gui Python package
 gui_sources = [
   'todotxt_gui/__init__.py',
@@ -58,17 +67,21 @@ gui_sources = [
   'todotxt_gui/_content_header.py',
   'todotxt_gui/_core.py',
   'todotxt_gui/_detail_panel.py',
+  'todotxt_gui/_detail_panel_tags.py',
   'todotxt_gui/_dialogs.py',
   'todotxt_gui/_file_monitor.py',
-  'todotxt_gui/_grouping.py',
   'todotxt_gui/_preferences.py',
   'todotxt_gui/_shortcuts.py',
   'todotxt_gui/_sidebar.py',
+  'todotxt_gui/_sidebar_state.py',
+  'todotxt_gui/_task_row_state.py',
   'todotxt_gui/_ui.py',
   'todotxt_gui/_task_row.py',
   'todotxt_gui/_welcome.py',
   'todotxt_gui/_widgets.py',
   'todotxt_gui/_window.py',
+  'todotxt_gui/_window_state.py',
+  'todotxt_gui/panel_cli.py',
 ]
 install_data(gui_sources, install_dir: moduledir)
 
@@ -84,9 +97,13 @@ endif
 lib_sources = [
   'todotxt_lib/__init__.py',
   'todotxt_lib/env.py',
+  'todotxt_lib/filtering.py',
+  'todotxt_lib/grouping.py',
+  'todotxt_lib/mutations.py',
   'todotxt_lib/operations.py',
   'todotxt_lib/parser.py',
   'todotxt_lib/task.py',
+  'todotxt_lib/text_editing.py',
   'todotxt_lib/todo_file.py',
 ]
 install_data(lib_sources, install_dir: libdir)
