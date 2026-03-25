@@ -8,7 +8,8 @@ import gi
 
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
-from gi.repository import Gdk, GObject, Gtk
+gi.require_version("Pango", "1.0")
+from gi.repository import Gdk, GObject, Gtk, Pango
 from todotxt_lib import Task
 
 from ._task_row_state import build_task_row_display
@@ -45,6 +46,7 @@ class TaskRow(Gtk.ListBoxRow):
         show_raw_text: bool = True,
     ) -> None:
         super().__init__()
+        self.add_css_class("task-row")
         self.task = task
         self._on_complete = on_complete
         self._on_delete = on_delete
@@ -116,9 +118,21 @@ class TaskRow(Gtk.ListBoxRow):
         drag: Gdk.Drag,
     ) -> None:
         icon = Gtk.DragIcon.get_for_drag(drag)
-        label = Gtk.Label(label=self.task.text)
-        label.add_css_class("drag-icon")
-        icon.set_child(label)
+        icon.add_css_class("drag-icon-root")
+
+        box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        box.add_css_class("drag-icon")
+        box.add_css_class("task-row-box")
+        box.set_overflow(Gtk.Overflow.HIDDEN)
+
+        label = Gtk.Label(label=self.task.text, xalign=0.0)
+        label.add_css_class("drag-icon-label")
+        label.add_css_class("task-row-title")
+        label.set_ellipsize(Pango.EllipsizeMode.END)
+        label.set_max_width_chars(36)
+        box.append(label)
+
+        icon.set_child(box)
 
     def _on_checked(self, _check: object) -> None:
         self._on_complete(self.task)

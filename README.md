@@ -185,11 +185,19 @@ tests/
 - **Native appearance.** The application uses libadwaita widgets and built-in
   CSS classes wherever possible. Custom CSS is limited to elements with no
   Adwaita equivalent: project circle colors, priority dots, due-date badges,
-  context chips, and the FAB button.
+  context chips, subtle task-row states, drag previews, and the FAB button.
+
+- **Flat task lists over card chrome.** The main task view uses quiet,
+  list-like rows instead of per-task cards, to stay closer to GNOME's native
+  content views and to keep grouped task sections readable.
 
 - **Blueprint for layout, Python for logic.** Static widget trees are declared
   in `.blp` files. Dynamic content (task lists, filter counts, chip creation)
   is handled in Python.
+
+- **Multiple assignment paths.** Projects and contexts can be assigned through
+  drag-and-drop, direct typing, inline suggestions, or quick pickers in the
+  detail panel, so the feature remains usable with different input styles.
 
 - **Plain-text storage.** Your data lives in standard `todo.txt` and `done.txt`
   files — always portable, always yours.

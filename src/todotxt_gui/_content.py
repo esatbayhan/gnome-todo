@@ -82,7 +82,7 @@ class TaskSection(Gtk.Box):
 
         list_box = Gtk.ListBox()
         list_box.set_selection_mode(Gtk.SelectionMode.SINGLE)
-        list_box.add_css_class("boxed-list")
+        list_box.add_css_class("task-list")
         if self._on_task_selected is not None:
             list_box.connect("row-activated", self._on_row_activated)
 

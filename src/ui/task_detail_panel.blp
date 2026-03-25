@@ -178,6 +178,27 @@ template $TaskDetailPanel: Gtk.Box {
             Adw.EntryRow label_entry {
               title: "Add @label";
               entry-activated => $on_add_context();
+
+              [suffix]
+              Gtk.MenuButton label_picker_btn {
+                icon-name: "view-more-symbolic";
+                tooltip-text: "Choose existing label";
+                valign: center;
+                styles ["flat"]
+
+                popover: Gtk.Popover {
+                  Gtk.ScrolledWindow {
+                    min-content-height: 120;
+                    max-content-height: 240;
+                    hscrollbar-policy: never;
+
+                    Gtk.ListBox label_picker_list {
+                      selection-mode: none;
+                      styles ["boxed-list"]
+                    }
+                  }
+                };
+              }
             }
           }
 
@@ -194,6 +215,27 @@ template $TaskDetailPanel: Gtk.Box {
             Adw.EntryRow project_entry {
               title: "Add +project";
               entry-activated => $on_add_project();
+
+              [suffix]
+              Gtk.MenuButton project_picker_btn {
+                icon-name: "view-more-symbolic";
+                tooltip-text: "Choose existing project";
+                valign: center;
+                styles ["flat"]
+
+                popover: Gtk.Popover {
+                  Gtk.ScrolledWindow {
+                    min-content-height: 120;
+                    max-content-height: 240;
+                    hscrollbar-policy: never;
+
+                    Gtk.ListBox project_picker_list {
+                      selection-mode: none;
+                      styles ["boxed-list"]
+                    }
+                  }
+                };
+              }
             }
           }
 

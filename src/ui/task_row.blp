@@ -4,10 +4,11 @@ template $TaskRow: Gtk.ListBoxRow {
   Gtk.Box {
     orientation: horizontal;
     spacing: 10;
-    margin-start: 4;
-    margin-end: 4;
-    margin-top: 4;
-    margin-bottom: 4;
+    margin-start: 2;
+    margin-end: 2;
+    margin-top: 1;
+    margin-bottom: 1;
+    styles ["task-row-box"]
 
     Gtk.CheckButton check {
       valign: center;
@@ -15,21 +16,24 @@ template $TaskRow: Gtk.ListBoxRow {
 
     Gtk.Box content_box {
       orientation: vertical;
-      spacing: 2;
+      spacing: 1;
       hexpand: true;
       valign: center;
+      styles ["task-row-content"]
 
       Gtk.Label text_label {
         xalign: 0.0;
         hexpand: true;
         wrap: true;
         wrap-mode: word_char;
+        styles ["task-row-title"]
       }
 
       Gtk.Box meta_box {
         orientation: horizontal;
-        spacing: 6;
+        spacing: 5;
         visible: false;
+        styles ["task-row-meta"]
       }
     }
 

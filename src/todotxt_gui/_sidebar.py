@@ -70,6 +70,7 @@ class TagRow(Gtk.ListBoxRow):
         on_task_dropped: TaskDroppedHandler | None = None,
     ) -> None:
         super().__init__()
+        self.add_css_class("tag-row")
         self.tag_name = tag_name
         self.tag_kind = tag_kind
         self._on_task_dropped = on_task_dropped
@@ -78,10 +79,15 @@ class TagRow(Gtk.ListBoxRow):
 
     def _build(self, count: int) -> None:
         box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        box.add_css_class("tag-row-box")
+        box.set_hexpand(True)
+        box.set_halign(Gtk.Align.FILL)
         box.set_margin_start(8)
         box.set_margin_end(8)
         box.set_margin_top(6)
         box.set_margin_bottom(6)
+        self.set_hexpand(True)
+        self.set_halign(Gtk.Align.FILL)
         self.set_child(box)
 
         # Colored circle

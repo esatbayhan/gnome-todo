@@ -104,6 +104,49 @@
     opacity: 1;
 }
 
+/* ── Task list ───────────────────────────────────────────────────────── */
+
+.task-list {
+    background-color: transparent;
+}
+
+.task-list row.task-row {
+    background-color: transparent;
+    box-shadow: none;
+}
+
+.task-row-box {
+    border-radius: 10px;
+    padding: 6px 12px;
+    transition: background-color 160ms ease;
+}
+
+.task-row-content {
+    margin-top: 0;
+    margin-bottom: 0;
+}
+
+.task-row-title {
+    font-weight: 500;
+}
+
+.task-row-meta {
+    margin-top: 0;
+}
+
+.task-list row.task-row:hover .task-row-box {
+    background-color: alpha(currentColor, 0.04);
+}
+
+.task-list row.task-row:selected .task-row-box,
+.task-list row.task-row:focus-within .task-row-box {
+    background-color: alpha(@accent_color, 0.12);
+}
+
+.task-list row.task-row .task-delete-btn {
+    margin-top: 1px;
+}
+
 /* ── FAB (floating action button) ─────────────────────────────────────── */
 
 .fab-button {
@@ -119,16 +162,33 @@
 
 /* ── Drag-and-drop ───────────────────────────────────────────────────── */
 
-.drop-highlight {
-    background-color: alpha(@accent_color, 0.15);
-    border-radius: 8px;
+.drag-icon-root {
+    background-color: transparent;
 }
 
 .drag-icon {
-    padding: 8px 12px;
-    background-color: @card_bg_color;
-    border-radius: 8px;
+    padding: 10px 12px;
+    background-color: @window_bg_color;
+    border-radius: 10px;
+    border: 1px solid alpha(black, 0.08);
+}
+
+.drag-icon-label {
     font-size: 13px;
+}
+
+.tag-row-box {
+    border-radius: 10px;
+    transition: background-color 160ms ease;
+}
+
+.tag-row.drop-highlight {
+    background-color: alpha(@accent_color, 0.12);
+    border-radius: 10px;
+}
+
+.tag-row.drop-highlight .tag-row-box {
+    background-color: transparent;
 }
 
 /* ── Task delete button hover reveal ──────────────────────────────────── */
@@ -138,7 +198,6 @@
     transition: opacity 200ms;
 }
 
-.task-row:hover .task-delete-btn,
-row:hover .task-delete-btn {
+.task-row:hover .task-delete-btn {
     opacity: 1;
 }

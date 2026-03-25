@@ -50,8 +50,12 @@ class TaskDetailPanel(Gtk.Box):
     completed_switch = Gtk.Template.Child()
     labels_flow = Gtk.Template.Child()
     label_entry = Gtk.Template.Child()
+    label_picker_btn = Gtk.Template.Child()
+    label_picker_list = Gtk.Template.Child()
     projects_flow = Gtk.Template.Child()
     project_entry = Gtk.Template.Child()
+    project_picker_btn = Gtk.Template.Child()
+    project_picker_list = Gtk.Template.Child()
     created_row = Gtk.Template.Child()
     completed_date_row = Gtk.Template.Child()
 
@@ -89,6 +93,8 @@ class TaskDetailPanel(Gtk.Box):
         """Update the lists used for autocomplete suggestions."""
         self._all_contexts = contexts
         self._all_projects = projects
+        self._refresh_context_picker()
+        self._refresh_project_picker()
 
     def set_task(self, task: Task | None) -> None:
         """Populate the panel with a task, or clear it."""
@@ -135,9 +141,11 @@ class TaskDetailPanel(Gtk.Box):
 
             # Labels (contexts)
             self._refresh_context_flow()
+            self._refresh_context_picker()
 
             # Projects
             self._refresh_project_flow()
+            self._refresh_project_picker()
 
             # Info
             if task.creation_date:
@@ -297,6 +305,18 @@ class TaskDetailPanel(Gtk.Box):
         self.project_entry.set_text("")
         self._emit_task_update(add_project=proj)
 
+    def _on_add_context_picker(self, ctx: str) -> None:
+        self._emit_task_update(add_context=ctx)
+        popover = self.label_picker_btn.get_popover()
+        if popover is not None:
+            popover.popdown()
+
+    def _on_add_project_picker(self, proj: str) -> None:
+        self._emit_task_update(add_project=proj)
+        popover = self.project_picker_btn.get_popover()
+        if popover is not None:
+            popover.popdown()
+
     def _refresh_context_flow(self, *, filter_text: str = "") -> None:
         if self._task is None:
             return
@@ -309,6 +329,16 @@ class TaskDetailPanel(Gtk.Box):
             ),
             on_remove=self._on_remove_context,
             on_add=self._on_add_context_suggestion,
+        )
+
+    def _refresh_context_picker(self) -> None:
+        self._rebuild_picker_list(
+            self.label_picker_list,
+            self.label_picker_btn,
+            self._all_contexts,
+            self._task.contexts if self._task is not None else (),
+            "@",
+            self._on_add_context_picker,
         )
 
     def _refresh_project_flow(self, *, filter_text: str = "") -> None:
@@ -324,6 +354,59 @@ class TaskDetailPanel(Gtk.Box):
             on_remove=self._on_remove_project,
             on_add=self._on_add_project_suggestion,
         )
+
+    def _refresh_project_picker(self) -> None:
+        self._rebuild_picker_list(
+            self.project_picker_list,
+            self.project_picker_btn,
+            self._all_projects,
+            self._task.projects if self._task is not None else (),
+            "+",
+            self._on_add_project_picker,
+        )
+
+    def _rebuild_picker_list(
+        self,
+        listbox: Gtk.ListBox,
+        button: Gtk.MenuButton,
+        available: list[str],
+        current: tuple[str, ...],
+        prefix: str,
+        on_add: Callable[[str], None],
+    ) -> None:
+        listbox.remove_all()
+        options = [item for item in available if item not in current]
+        button.set_sensitive(bool(options) and self._task is not None)
+
+        if not options:
+            row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+            row.set_margin_start(12)
+            row.set_margin_end(12)
+            row.set_margin_top(10)
+            row.set_margin_bottom(10)
+            label = Gtk.Label(label="No suggestions available", xalign=0.0)
+            label.add_css_class("dim-label")
+            row.append(label)
+            listbox.append(row)
+            return
+
+        for item in options:
+            add_btn = Gtk.Button(label=f"{prefix}{item}")
+            add_btn.add_css_class("flat")
+            add_btn.set_halign(Gtk.Align.FILL)
+            add_btn.set_hexpand(True)
+            add_btn.connect("clicked", self._make_picker_handler(on_add, item))
+            listbox.append(add_btn)
+
+    def _make_picker_handler(
+        self,
+        callback: Callable[[str], None],
+        item: str,
+    ) -> Callable[[object], None]:
+        def handler(_btn: object) -> None:
+            callback(item)
+
+        return handler
 
     def _emit_task_update(self, **changes: str | None) -> None:
         if self._task is None or self._on_task_updated is None:
