@@ -16,7 +16,7 @@ def config_path() -> Path:
     return base / _APP_ID / "config.json"
 
 
-def load_config() -> dict[str, str]:
+def load_config() -> dict[str, object]:
     """Load the config file, returning an empty dict if missing."""
     p = config_path()
     if not p.exists():
@@ -24,7 +24,7 @@ def load_config() -> dict[str, str]:
     return json.loads(p.read_text(encoding="utf-8"))  # type: ignore[no-any-return]
 
 
-def save_config(data: dict[str, str]) -> None:
+def save_config(data: dict[str, object]) -> None:
     """Write *data* to the config file, creating directories as needed."""
     p = config_path()
     p.parent.mkdir(parents=True, exist_ok=True)
@@ -46,11 +46,23 @@ def set_todo_dir(directory: Path) -> None:
 
 def get_show_raw_text() -> bool:
     """Return whether to show raw task text (True) or clean text (False)."""
-    return load_config().get("show_raw_text", False)
+    return bool(load_config().get("show_raw_text", False))
 
 
 def set_show_raw_text(value: bool) -> None:
     """Persist the show-raw-text preference."""
     cfg = load_config()
     cfg["show_raw_text"] = value
+    save_config(cfg)
+
+
+def get_auto_normalize_multi_task_files() -> bool:
+    """Return whether multi-task files should normalize on mutation."""
+    return bool(load_config().get("auto_normalize_multi_task_files", True))
+
+
+def set_auto_normalize_multi_task_files(value: bool) -> None:
+    """Persist the multi-task normalization preference."""
+    cfg = load_config()
+    cfg["auto_normalize_multi_task_files"] = value
     save_config(cfg)

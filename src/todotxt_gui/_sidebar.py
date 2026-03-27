@@ -12,13 +12,13 @@ gi.require_version("Adw", "1")
 gi.require_version("Pango", "1.0")
 from gi.repository import Gdk, GObject, Gtk, Pango
 
-from todotxt_lib import build_tag_list
+from todotxt_lib import TaskRef, build_tag_list
 
 from ._sidebar_state import project_color
 from ._ui import RESOURCE_PREFIX
 
 TagKind = Literal["project", "context"]
-TaskDroppedHandler = Callable[[str, str, TagKind], None]
+TaskDroppedHandler = Callable[[TaskRef, str, TagKind], None]
 
 
 # ── Smart filter list rows ─────────────────────────────────────────────
@@ -126,7 +126,11 @@ class TagRow(Gtk.ListBoxRow):
     ) -> bool:
         self.remove_css_class("drop-highlight")
         if self._on_task_dropped is not None:
-            self._on_task_dropped(value, self.tag_name, self.tag_kind)
+            try:
+                task_ref = TaskRef.from_token(value)
+            except ValueError:
+                return False
+            self._on_task_dropped(task_ref, self.tag_name, self.tag_kind)
         return True
 
     def _on_drop_enter(

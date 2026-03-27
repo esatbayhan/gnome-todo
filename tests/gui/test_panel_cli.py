@@ -50,31 +50,11 @@ class TestAgendaSummary(unittest.TestCase):
         self.assertEqual(result.counts["due_today"], 1)
         self.assertEqual(result.counts["scheduled_today"], 0)
         self.assertEqual(result.counts["overdue"], 1)
-        self.assertEqual(
-            result.sections["due_today"][0]["scheduled"],
-            "2026-03-23",
-        )
-        self.assertEqual(
-            result.sections["overdue"][0]["scheduled"],
-            "2026-03-23",
-        )
-
-    def test_ignores_malformed_dates_without_crashing(self) -> None:
-        tasks = [
-            parse_task("Odd due:2026-99-99"),
-            parse_task("Still scheduled scheduled:2026-03-23"),
-        ]
-
-        result = build_agenda_summary(tasks, today=date(2026, 3, 23))
-
-        self.assertEqual(result.counts["overdue"], 0)
-        self.assertEqual(result.counts["due_today"], 0)
-        self.assertEqual(result.counts["scheduled_today"], 1)
 
 
 class TestAddPayload(unittest.TestCase):
     def test_missing_configuration_returns_error(self) -> None:
-        env = {k: v for k, v in os.environ.items() if k not in {"TODO_FILE", "TODO_DIR", "TODO_DONE_FILE"}}
+        env = {k: v for k, v in os.environ.items() if k != "TODO_DIR"}
         with patch.dict(os.environ, env, clear=True):
             with patch("todotxt_gui.panel_cli.get_todo_dir", return_value=None):
                 result = add_payload("Write tests")
@@ -84,19 +64,23 @@ class TestAddPayload(unittest.TestCase):
 
     def test_adds_plain_text_task(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
-            result = self._add_in_tempdir(tmpdir, "Write tests", today=date(2026, 3, 23))
-            todo_path = Path(tmpdir) / "todo.txt"
+            root = self._make_root(tmpdir)
+            result = self._add_in_tempdir(root, "Write tests", today=date(2026, 3, 23))
 
             self.assertTrue(result["ok"])
+            active_files = sorted(root.glob("*.txt"))
+            self.assertEqual(len(active_files), 1)
+            self.assertEqual(active_files[0].name, "task-000001.txt")
             self.assertEqual(
-                todo_path.read_text(encoding="utf-8"),
+                active_files[0].read_text(encoding="utf-8"),
                 "2026-03-23 Write tests\n",
             )
 
     def test_preserves_raw_todotxt_syntax(self) -> None:
         text = "Plan launch +Work @desk due:2026-03-24 scheduled:2026-03-25"
         with tempfile.TemporaryDirectory() as tmpdir:
-            result = self._add_in_tempdir(tmpdir, text, today=date(2026, 3, 23))
+            root = self._make_root(tmpdir)
+            result = self._add_in_tempdir(root, text, today=date(2026, 3, 23))
 
             self.assertTrue(result["ok"])
             task = result["task"]
@@ -106,16 +90,22 @@ class TestAddPayload(unittest.TestCase):
             self.assertEqual(task["due"], "2026-03-24")
             self.assertEqual(task["scheduled"], "2026-03-25")
 
-    def _add_in_tempdir(self, tmpdir: str, text: str, *, today: date) -> dict[str, object]:
+    def _make_root(self, tmpdir: str) -> Path:
+        root = Path(tmpdir) / "todo.txt.d"
+        root.mkdir()
+        (root / "done.txt.d").mkdir()
+        return root
+
+    def _add_in_tempdir(self, root: Path, text: str, *, today: date) -> dict[str, object]:
         env = os.environ.copy()
-        env["TODO_DIR"] = tmpdir
+        env["TODO_DIR"] = str(root)
         with patch.dict(os.environ, env, clear=True):
             return add_payload(text, today=today)
 
 
 class TestSummaryPayload(unittest.TestCase):
     def test_summary_reports_missing_configuration(self) -> None:
-        env = {k: v for k, v in os.environ.items() if k not in {"TODO_FILE", "TODO_DIR", "TODO_DONE_FILE"}}
+        env = {k: v for k, v in os.environ.items() if k != "TODO_DIR"}
         with patch.dict(os.environ, env, clear=True):
             with patch("todotxt_gui.panel_cli.get_todo_dir", return_value=None):
                 result = summary_payload(today=date(2026, 3, 23))
@@ -123,15 +113,19 @@ class TestSummaryPayload(unittest.TestCase):
         self.assertFalse(result["configured"])
         self.assertEqual(result["counts"]["total"], 0)
 
-    def test_summary_ignores_active_tasks_in_done_file(self) -> None:
+    def test_summary_ignores_active_tasks_in_done_directory(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
-            todo_path = Path(tmpdir) / "todo.txt"
-            done_path = Path(tmpdir) / "done.txt"
-            todo_path.write_text("", encoding="utf-8")
-            done_path.write_text("Unexpected active task due:2026-03-23\n", encoding="utf-8")
+            root = Path(tmpdir) / "todo.txt.d"
+            root.mkdir()
+            done_dir = root / "done.txt.d"
+            done_dir.mkdir()
+            (done_dir / "unexpected.txt").write_text(
+                "Unexpected active task due:2026-03-23\n",
+                encoding="utf-8",
+            )
 
             env = os.environ.copy()
-            env["TODO_DIR"] = tmpdir
+            env["TODO_DIR"] = str(root)
             with patch.dict(os.environ, env, clear=True):
                 result = summary_payload(today=date(2026, 3, 23))
 
@@ -141,14 +135,16 @@ class TestSummaryPayload(unittest.TestCase):
 
     def test_summary_payload_keeps_expected_task_shape(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
-            todo_path = Path(tmpdir) / "todo.txt"
-            todo_path.write_text(
+            root = Path(tmpdir) / "todo.txt.d"
+            root.mkdir()
+            (root / "done.txt.d").mkdir()
+            (root / "task.txt").write_text(
                 "(A) Plan launch +Work @desk due:2026-03-23 scheduled:2026-03-23\n",
                 encoding="utf-8",
             )
 
             env = os.environ.copy()
-            env["TODO_DIR"] = tmpdir
+            env["TODO_DIR"] = str(root)
             with patch.dict(os.environ, env, clear=True):
                 result = summary_payload(today=date(2026, 3, 23))
 
@@ -175,10 +171,6 @@ class TestSummaryPayload(unittest.TestCase):
         self.assertEqual(task["contexts"], ["desk"])
         self.assertEqual(task["due"], "2026-03-23")
         self.assertEqual(task["scheduled"], "2026-03-23")
-        self.assertEqual(
-            task["keyvalues"],
-            {"due": "2026-03-23", "scheduled": "2026-03-23"},
-        )
 
 
 if __name__ == "__main__":

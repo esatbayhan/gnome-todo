@@ -1,6 +1,6 @@
 [Desktop Entry]
 Name=Todo
-Comment=Manage your tasks with the todo.txt format
+Comment=Manage your tasks with the todo.txt.d format
 Exec=todogui
 Icon=dev.bayhan.GnomeTodo
 Terminal=false

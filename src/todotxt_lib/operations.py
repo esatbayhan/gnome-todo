@@ -2,136 +2,97 @@ from __future__ import annotations
 
 from datetime import date
 
-from .parser import parse_task, serialize_fields
-from .task import Priority, Task
-from .todo_file import TodoFile
+from .parser import serialize_fields
+from .task import Priority, Task, TaskRef
+from .todo_directory import TodoDirectory
 
 
-def _replace_in_file(file: TodoFile, old_task: Task, new_task: Task) -> None:
-    """Replace old_task with new_task in the file's task list."""
-    idx = file.tasks.index(old_task)
-    file.tasks[idx] = new_task
+def _task_ref(task: Task) -> TaskRef:
+    if task.ref is None:
+        raise ValueError("Task is not backed by a todo.txt.d file")
+    return task.ref
 
 
 def add_task(
-    file: TodoFile,
+    directory: TodoDirectory,
     text: str,
     creation_date: date | None = None,
 ) -> Task:
-    """Add a new task with an auto-prepended creation date."""
-    effective_date = creation_date if creation_date is not None else date.today()
-    task = parse_task(f"{effective_date} {text}")
-    file.tasks.append(task)
-    return task
+    """Add a new active task to the todo.txt.d root."""
+    return directory.add_task(text, creation_date=creation_date)
 
 
 def complete_task(
-    file: TodoFile,
+    directory: TodoDirectory,
     task: Task,
     completion_date: date | None = None,
 ) -> Task:
-    """Mark a task as done in the file. Priority is discarded on completion."""
-    effective_date = completion_date if completion_date is not None else date.today()
-    raw = serialize_fields(True, None, effective_date, task.creation_date, task.text)
-    new_task = Task(
-        raw=raw,
-        done=True,
-        priority=None,
-        completion_date=effective_date,
-        creation_date=task.creation_date,
-        text=task.text,
-        projects=task.projects,
-        contexts=task.contexts,
-        keyvalues=task.keyvalues,
+    """Mark a task as done and move it into done.txt.d."""
+    completed = directory.complete_task(
+        _task_ref(task),
+        completion_date=completion_date,
     )
-    _replace_in_file(file, task, new_task)
-    return new_task
+    if completed is None:
+        raise ValueError("Task is missing or already completed")
+    return completed
 
 
-def uncomplete_task(file: TodoFile, task: Task) -> Task:
-    """Mark a completed task as not done. Completion date is removed."""
-    if not task.done:
-        raise ValueError("Task is not completed")
-    raw = serialize_fields(False, None, None, task.creation_date, task.text)
-    new_task = Task(
-        raw=raw,
-        done=False,
-        priority=None,
-        completion_date=None,
-        creation_date=task.creation_date,
-        text=task.text,
-        projects=task.projects,
-        contexts=task.contexts,
-        keyvalues=task.keyvalues,
-    )
-    _replace_in_file(file, task, new_task)
-    return new_task
+def uncomplete_task(directory: TodoDirectory, task: Task) -> Task:
+    """Move a completed task back into the active directory."""
+    result = directory.uncomplete_task(_task_ref(task))
+    if result is None:
+        raise ValueError("Task is missing or not completed")
+    return result
 
 
-def delete_task(file: TodoFile, task: Task) -> None:
-    """Remove a task from the file's task list."""
-    file.tasks.remove(task)
+def delete_task(directory: TodoDirectory, task: Task) -> None:
+    """Delete a task from storage."""
+    if not directory.delete_task(_task_ref(task)):
+        raise ValueError("Task is missing")
 
 
-def set_priority(file: TodoFile, task: Task, priority: Priority) -> Task:
-    """Set priority on a task in the file.
-
-    Raises ValueError if the task is already completed (completed tasks have
-    no priority field).
-    """
+def set_priority(
+    directory: TodoDirectory,
+    task: Task,
+    priority: Priority,
+) -> Task:
+    """Set priority on an active task."""
     if task.done:
         raise ValueError("Cannot set priority on a completed task")
     raw = serialize_fields(
-        False, priority, task.completion_date, task.creation_date, task.text
+        False,
+        priority,
+        task.completion_date,
+        task.creation_date,
+        task.text,
     )
-    new_task = Task(
-        raw=raw,
-        done=task.done,
-        priority=priority,
-        completion_date=task.completion_date,
-        creation_date=task.creation_date,
-        text=task.text,
-        projects=task.projects,
-        contexts=task.contexts,
-        keyvalues=task.keyvalues,
-    )
-    _replace_in_file(file, task, new_task)
-    return new_task
+    updated = directory.update_task(_task_ref(task), raw)
+    if updated is None:
+        raise ValueError("Task is missing")
+    return updated
 
 
-def deprioritize(file: TodoFile, task: Task) -> Task:
-    """Remove priority from a task in the file."""
+def deprioritize(directory: TodoDirectory, task: Task) -> Task:
+    """Remove priority from a task."""
     raw = serialize_fields(
-        task.done, None, task.completion_date, task.creation_date, task.text
+        task.done,
+        None,
+        task.completion_date,
+        task.creation_date,
+        task.text,
     )
-    new_task = Task(
-        raw=raw,
-        done=task.done,
-        priority=None,
-        completion_date=task.completion_date,
-        creation_date=task.creation_date,
-        text=task.text,
-        projects=task.projects,
-        contexts=task.contexts,
-        keyvalues=task.keyvalues,
-    )
-    _replace_in_file(file, task, new_task)
-    return new_task
+    updated = directory.update_task(_task_ref(task), raw)
+    if updated is None:
+        raise ValueError("Task is missing")
+    return updated
 
 
-def replace_task(file: TodoFile, old_task: Task, new_line: str) -> Task:
-    """Replace old_task in the file with a task parsed from new_line."""
-    new_task = parse_task(new_line)
-    _replace_in_file(file, old_task, new_task)
-    return new_task
-
-
-def archive(todo: TodoFile, done: TodoFile) -> int:
-    """Move all completed tasks from todo to done. Returns the count moved."""
-    completed = [t for t in todo.tasks if t.done]
-    done.tasks.extend(completed)
-    todo.tasks = [t for t in todo.tasks if not t.done]
-    return len(completed)
+def replace_task(directory: TodoDirectory, old_task: Task, new_line: str) -> Task:
+    """Replace a task with a fully serialized todo.txt line."""
+    updated = directory.update_task(_task_ref(old_task), new_line)
+    if updated is None:
+        raise ValueError("Task is missing")
+    return updated
 
 
 def sort_key(task: Task) -> tuple[int, str, str]:
@@ -148,16 +109,16 @@ def sort_tasks(tasks: list[Task]) -> list[Task]:
 def all_projects(tasks: list[Task]) -> list[str]:
     """Return a sorted list of all unique project names across tasks."""
     seen: set[str] = set()
-    for t in tasks:
-        seen.update(t.projects)
+    for task in tasks:
+        seen.update(task.projects)
     return sorted(seen)
 
 
 def all_contexts(tasks: list[Task]) -> list[str]:
     """Return a sorted list of all unique context names across tasks."""
     seen: set[str] = set()
-    for t in tasks:
-        seen.update(t.contexts)
+    for task in tasks:
+        seen.update(task.contexts)
     return sorted(seen)
 
 
@@ -170,21 +131,17 @@ def filter_tasks(
     done: bool | None = None,
     priority: Priority | None = None,
 ) -> list[Task]:
-    """Filter tasks by any combination of text, project, context, completion, priority.
-
-    text: case-insensitive substring match against the task description.
-    Multiple text terms can be applied by calling filter_tasks in a chain.
-    """
+    """Filter tasks by any combination of text, project, context, completion, priority."""
     result = tasks
     if text is not None:
         lower = text.lower()
-        result = [t for t in result if lower in t.text.lower()]
+        result = [task for task in result if lower in task.text.lower()]
     if project is not None:
-        result = [t for t in result if project in t.projects]
+        result = [task for task in result if project in task.projects]
     if context is not None:
-        result = [t for t in result if context in t.contexts]
+        result = [task for task in result if context in task.contexts]
     if done is not None:
-        result = [t for t in result if t.done == done]
+        result = [task for task in result if task.done == done]
     if priority is not None:
-        result = [t for t in result if t.priority == priority]
+        result = [task for task in result if task.priority == priority]
     return result

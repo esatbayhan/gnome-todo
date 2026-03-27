@@ -4,7 +4,7 @@ import re
 from datetime import date
 from types import MappingProxyType
 
-from .task import Priority, Task
+from .task import Priority, Task, TaskRef
 
 _PRIORITY_RE = re.compile(r"\(([A-Z])\) ")
 _DATE_RE = re.compile(r"(\d{4}-\d{2}-\d{2})")
@@ -13,6 +13,18 @@ _CONTEXT_RE = re.compile(r"(?:^|\s)@(\S+)")
 # Value must not start with '/' to exclude URLs (e.g. http://example.com).
 # Neither key nor value may contain whitespace or colons, per the spec.
 _KEYVALUE_RE = re.compile(r"(?:^|\s)([a-z]+):([^/\s:][^\s:]*)")
+
+
+def _parse_date_prefix(text: str) -> tuple[date, str] | None:
+    """Parse a leading ISO date token, treating invalid dates as plain text."""
+    match = _DATE_RE.match(text)
+    if match is None:
+        return None
+    try:
+        parsed = date.fromisoformat(match.group(1))
+    except ValueError:
+        return None
+    return parsed, text[match.end() :].removeprefix(" ")
 
 
 def serialize_fields(
@@ -38,7 +50,7 @@ def serialize_fields(
     return " ".join(parts)
 
 
-def parse_task(line: str) -> Task:
+def parse_task(line: str, *, ref: TaskRef | None = None) -> Task:
     """Parse a single todo.txt line into a Task.
 
     Follows the format rules from the todo.txt specification:
@@ -65,18 +77,16 @@ def parse_task(line: str) -> Task:
 
     # Dates — trailing space is consumed if present, but not required (handles
     # tasks that end with a date and have no description text).
-    m = _DATE_RE.match(rest)
-    if m:
-        d1 = date.fromisoformat(m.group(1))
-        rest = rest[m.end() :].removeprefix(" ")
+    parsed = _parse_date_prefix(rest)
+    if parsed is not None:
+        d1, rest = parsed
         if done:
             # For completed tasks: first date is the completion date
             completion_date = d1
             # Optional second date is the creation date
-            m2 = _DATE_RE.match(rest)
-            if m2:
-                creation_date = date.fromisoformat(m2.group(1))
-                rest = rest[m2.end() :].removeprefix(" ")
+            parsed_second = _parse_date_prefix(rest)
+            if parsed_second is not None:
+                creation_date, rest = parsed_second
         else:
             creation_date = d1
 
@@ -95,6 +105,7 @@ def parse_task(line: str) -> Task:
         completion_date=completion_date,
         creation_date=creation_date,
         text=text,
+        ref=ref,
         projects=projects,
         contexts=contexts,
         keyvalues=keyvalues,

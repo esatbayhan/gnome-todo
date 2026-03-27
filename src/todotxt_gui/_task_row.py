@@ -107,9 +107,11 @@ class TaskRow(Gtk.ListBoxRow):
         _x: float,
         _y: float,
     ) -> Gdk.ContentProvider | None:
+        if self.task.ref is None:
+            return None
         value = GObject.Value()
         value.init(GObject.TYPE_STRING)
-        value.set_string(self.task.raw)
+        value.set_string(self.task.ref.to_token())
         return Gdk.ContentProvider.new_for_value(value)
 
     def _on_drag_begin(

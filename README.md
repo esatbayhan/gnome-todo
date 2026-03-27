@@ -4,7 +4,7 @@
 
 <h1 align="center">Todo</h1>
 
-A GTK4/libadwaita desktop application for managing todo.txt files.
+A GTK4/libadwaita desktop application for managing `todo.txt.d` task directories.
 
 This project targets GNOME on Wayland. X11 sessions are not supported.
 
@@ -94,17 +94,16 @@ host distro theme provides the same set.
 
 ## Configuration
 
-The application reads todo.txt files based on these environment variables,
+The application resolves its `todo.txt.d` root directory from these sources,
 checked in order:
 
 | Variable | Purpose |
 |---|---|
-| `TODO_FILE` | Explicit path to `todo.txt` |
-| `TODO_DIR` | Directory containing `todo.txt` and `done.txt` |
+| `TODO_DIR` | Path to the `todo.txt.d` root directory |
 
-If neither is set, the application checks for a saved directory in
+If `TODO_DIR` is not set, the application checks for a saved directory in
 `~/.config/todotxt-gui/config.json`. On first launch (when no directory is
-configured), a welcome dialog prompts the user to choose a task folder.
+configured), a welcome dialog prompts the user to choose a `todo.txt.d` root.
 The directory can be changed later via **Preferences** in the hamburger menu.
 
 ## Keyboard shortcuts
@@ -119,12 +118,13 @@ The directory can be changed later via **Preferences** in the hamburger menu.
 | Ctrl+, | Preferences |
 | Ctrl+? | Keyboard shortcuts |
 
-## The todo.txt format
+## The todo.txt.d format
 
-This app uses the [todo.txt format](https://github.com/todotxt/todo.txt) — a
-simple, plain-text way to manage tasks. Each task is a single line in a text
-file, with optional priorities, dates, projects (`+project`), and contexts
-(`@context`).
+This app uses the [todo.txt.d format](https://github.com/esatbayhan/todo.txt.d): tasks are
+stored as `.txt` files inside a `todo.txt.d/` directory, with completed tasks
+archived into `todo.txt.d/done.txt.d/`. Each task line keeps the original
+todo.txt syntax, including priorities, dates, projects (`+project`),
+contexts (`@context`), and `key:value` metadata.
 
 ## Project structure
 
@@ -171,7 +171,7 @@ src/
     todotxt_lib/
         parser.py           todo.txt line parser
         task.py             Task data model
-        todo_file.py        File read/write operations
+        todo_directory.py   todo.txt.d storage and mutation engine
         operations.py       Task manipulation helpers
         env.py              Environment variable resolution
 
@@ -199,13 +199,13 @@ tests/
   drag-and-drop, direct typing, inline suggestions, or quick pickers in the
   detail panel, so the feature remains usable with different input styles.
 
-- **Plain-text storage.** Your data lives in standard `todo.txt` and `done.txt`
-  files — always portable, always yours.
+- **Plain-text storage.** Your data lives in a `todo.txt.d/` directory with one
+  plain-text task per file by default, plus `done.txt.d/` for completed tasks.
 
-- **Sync-friendly.** The todo.txt files are plain text and intended to be
-  synced across devices using tools like Syncthing, Nextcloud, or similar.
-  The application monitors the files for external changes and automatically
-  reloads when they are modified outside the app.
+- **Sync-friendly.** `todo.txt.d/` is designed for file-based syncing tools
+  like Syncthing or Nextcloud. The application monitors the task directories
+  for external changes and automatically reloads when tasks are modified
+  outside the app.
 
 ## Contributing
 

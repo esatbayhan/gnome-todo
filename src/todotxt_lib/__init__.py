@@ -1,4 +1,4 @@
-from .env import done_file_path, todo_file_path
+from .env import todo_dir_path
 from .filtering import (
     SelectionKind,
     SidebarSelection,
@@ -28,17 +28,16 @@ from .mutations import (
     TaskLocation,
     add_tag_to_task,
     add_task_with_priority,
-    complete_task_by_raw,
-    delete_task_by_raw,
-    find_task_by_raw,
-    uncomplete_task_by_raw,
+    complete_task_by_ref,
+    delete_task_by_ref,
+    find_task_by_ref,
+    uncomplete_task_by_ref,
     update_task_from_detail,
 )
 from .operations import (
     add_task,
     all_contexts,
     all_projects,
-    archive,
     complete_task,
     delete_task,
     deprioritize,
@@ -50,45 +49,44 @@ from .operations import (
     uncomplete_task,
 )
 from .parser import parse_task, serialize_fields, serialize_task
-from .task import Priority, Task
+from .task import Priority, Task, TaskRef
 from .text_editing import (
     append_missing_task_metadata,
     clean_task_text,
     normalize_tag_input,
     rebuild_task_line,
 )
-from .todo_file import TodoFile
+from .todo_directory import TodoDirectory
 
 __all__ = [
     "MutationOutcome",
     "Priority",
     "Task",
+    "TaskRef",
     "TaskLocation",
-    "TodoFile",
-    "done_file_path",
+    "TodoDirectory",
     "parse_task",
     "serialize_fields",
     "serialize_task",
-    "todo_file_path",
+    "todo_dir_path",
     "add_task",
     "add_tag_to_task",
     "add_task_with_priority",
     "all_contexts",
     "all_projects",
-    "archive",
     "complete_task",
-    "complete_task_by_raw",
+    "complete_task_by_ref",
     "delete_task",
-    "delete_task_by_raw",
+    "delete_task_by_ref",
     "deprioritize",
     "filter_tasks",
-    "find_task_by_raw",
+    "find_task_by_ref",
     "replace_task",
     "set_priority",
     "sort_key",
     "sort_tasks",
     "uncomplete_task",
-    "uncomplete_task_by_raw",
+    "uncomplete_task_by_ref",
     "update_task_from_detail",
     "append_missing_task_metadata",
     "clean_task_text",

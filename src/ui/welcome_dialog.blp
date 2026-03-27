@@ -27,19 +27,19 @@ template $WelcomeDialog: Adw.Dialog {
       }
 
       Gtk.Label {
-        label: "Welcome to todo.txt";
+        label: "Welcome to todo.txt.d";
         styles ["title-1"]
       }
 
       Gtk.Label {
-        label: "Choose a folder for your task files.\nThis folder will contain todo.txt and done.txt.";
+        label: "Choose your todo.txt.d root directory.\nOpen tasks live here, and completed tasks go in done.txt.d.";
         wrap: true;
         justify: center;
         styles ["body"]
       }
 
       Gtk.Button choose_btn {
-        label: "Choose Folder…";
+        label: "Choose Directory…";
         halign: center;
         clicked => $on_choose_clicked();
         styles ["suggested-action", "pill"]

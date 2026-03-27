@@ -26,5 +26,3 @@ build-dir/
 # OS
 .DS_Store
 Thumbs.db
-
-specs/

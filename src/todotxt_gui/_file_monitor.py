@@ -1,4 +1,4 @@
-"""File monitoring with debounced reload for external changes."""
+"""Path monitoring with debounced reload for external changes."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from gi.repository import Gio, GLib
 
 
 class FileMonitor:
-    """Watch files for external modifications and trigger a debounced reload."""
+    """Watch files or directories and trigger a debounced reload."""
 
     def __init__(
         self,
@@ -30,8 +30,12 @@ class FileMonitor:
         """Start watching all configured paths."""
         self.teardown()
         for path in self._paths:
+            path.mkdir(parents=True, exist_ok=True)
             gfile = Gio.File.new_for_path(str(path))
-            monitor = gfile.monitor_file(Gio.FileMonitorFlags.NONE, None)
+            if path.is_dir():
+                monitor = gfile.monitor_directory(Gio.FileMonitorFlags.NONE, None)
+            else:
+                monitor = gfile.monitor_file(Gio.FileMonitorFlags.NONE, None)
             monitor.connect("changed", self._on_file_changed)
             self._monitors.append(monitor)
 

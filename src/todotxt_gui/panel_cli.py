@@ -10,10 +10,10 @@ from dataclasses import asdict, dataclass
 from datetime import date
 from pathlib import Path
 
-from todotxt_lib import Task, TodoFile, add_task, classify_task, clean_task_text
-from todotxt_lib.env import todo_file_path as resolve_todo_file_path
+from todotxt_lib import Task, TodoDirectory, add_task, classify_task, clean_task_text
+from todotxt_lib.env import todo_dir_path as resolve_todo_dir_path
 
-from ._config import get_todo_dir
+from ._config import get_auto_normalize_multi_task_files, get_todo_dir
 
 
 SECTION_ORDER = ("overdue", "due_today", "scheduled_today")
@@ -30,10 +30,10 @@ class AgendaSummary:
 
 @dataclass(frozen=True)
 class ResolvedPaths:
-    """Resolved panel file paths and configuration state."""
+    """Resolved panel storage directory and configuration state."""
 
     configured: bool
-    todo_path: Path
+    todo_dir: Path
 
 
 def _task_to_payload(task: Task) -> dict[str, object]:
@@ -82,25 +82,27 @@ def _empty_summary(*, configured: bool) -> AgendaSummary:
 
 
 def _resolve_paths() -> ResolvedPaths:
-    """Resolve the todo.txt path once per CLI request."""
+    """Resolve the todo.txt.d root once per CLI request."""
     config_dir = get_todo_dir()
-    configured = bool(
-        os.environ.get("TODO_FILE")
-        or os.environ.get("TODO_DIR")
-        or os.environ.get("TODO_DONE_FILE")
-        or config_dir
-    )
+    configured = bool(os.environ.get("TODO_DIR") or config_dir)
     return ResolvedPaths(
         configured=configured,
-        todo_path=resolve_todo_file_path(config_dir=config_dir),
+        todo_dir=resolve_todo_dir_path(config_dir=config_dir),
     )
 
 
-def _load_active_tasks(todo_path: Path) -> list[Task]:
-    """Load active tasks from todo.txt only."""
-    todo = TodoFile(todo_path)
-    todo.load()
-    return [task for task in todo.tasks if not task.done]
+def _load_active_tasks(todo_dir: Path) -> list[Task]:
+    """Load active tasks from the todo.txt.d root directory."""
+    store = TodoDirectory(
+        todo_dir,
+        auto_normalize_multi_task_files=get_auto_normalize_multi_task_files(),
+    )
+    store.load()
+    return [
+        task
+        for task in store.tasks
+        if not task.done and (task.ref is None or not task.ref.is_done)
+    ]
 
 
 def summary_payload(*, today: date | None = None) -> dict[str, object]:
@@ -108,7 +110,7 @@ def summary_payload(*, today: date | None = None) -> dict[str, object]:
     paths = _resolve_paths()
     if not paths.configured:
         return asdict(_empty_summary(configured=False))
-    return asdict(build_agenda_summary(_load_active_tasks(paths.todo_path), today=today))
+    return asdict(build_agenda_summary(_load_active_tasks(paths.todo_dir), today=today))
 
 
 def add_payload(text: str, *, today: date | None = None) -> dict[str, object]:
@@ -127,12 +129,14 @@ def add_payload(text: str, *, today: date | None = None) -> dict[str, object]:
             "error": "Task text must not be empty",
         }
 
-    todo = TodoFile(paths.todo_path)
-    todo.load()
+    store = TodoDirectory(
+        paths.todo_dir,
+        auto_normalize_multi_task_files=get_auto_normalize_multi_task_files(),
+    )
+    store.load()
 
     try:
-        created = add_task(todo, stripped, creation_date=today)
-        todo.save()
+        created = add_task(store, stripped, creation_date=today)
     except OSError as exc:
         return {
             "ok": False,

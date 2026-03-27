@@ -8,7 +8,7 @@ This project is Wayland-only. X11 sessions are not supported and should not be d
 
 - GNOME Shell 49
 - `dev.bayhan.GnomeTodo` installed as a Flatpak
-- The Todo app configured with a task folder
+- The Todo app configured with a `todo.txt.d` directory
 
 ## Local install
 

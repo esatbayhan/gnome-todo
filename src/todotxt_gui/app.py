@@ -13,7 +13,7 @@ gi.require_version("Adw", "1")
 from gi.repository import Adw, Gdk, Gtk
 
 from ._config import set_todo_dir
-from ._core import done_file_path, has_configured_dir, todo_file_path
+from ._core import has_configured_dir, todo_dir_path
 from ._ui import RESOURCE_PREFIX
 from ._welcome import WelcomeDialog
 from ._window import TodoWindow
@@ -46,7 +46,7 @@ def _load_css() -> None:
 
 
 class _TodoGuiApp(Adw.Application):
-    """Adwaita application for todo.txt."""
+    """Adwaita application for todo.txt.d."""
 
     def __init__(self, options: RuntimeOptions) -> None:
         super().__init__(application_id="dev.bayhan.GnomeTodo")
@@ -79,8 +79,8 @@ class _TodoGuiApp(Adw.Application):
                     self.quit()
                     return
                 set_todo_dir(chosen_dir)
-                (chosen_dir / "todo.txt").touch(exist_ok=True)
-                (chosen_dir / "done.txt").touch(exist_ok=True)
+                chosen_dir.mkdir(parents=True, exist_ok=True)
+                (chosen_dir / "done.txt.d").mkdir(parents=True, exist_ok=True)
                 self._show_main_window()
 
             welcome.open(temp_win, on_dir_chosen)
@@ -91,8 +91,7 @@ class _TodoGuiApp(Adw.Application):
         """Create and present the main application window."""
         win = TodoWindow(
             application=self,
-            todo_path=todo_file_path(),
-            done_path=done_file_path(),
+            todo_dir=todo_dir_path(),
         )
         if self._options.screenshot is not None:
             assert _dev_screenshot is not None

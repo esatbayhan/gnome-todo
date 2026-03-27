@@ -5,10 +5,13 @@ All example tasks are taken directly from the todo.txt specification (https://gi
 
 import unittest
 from datetime import date
+import tempfile
 from types import MappingProxyType
+from pathlib import Path
 
 from todotxt_lib.parser import parse_task, serialize_task
-from todotxt_lib.task import Priority
+from todotxt_lib.task import Priority, TaskRef
+from todotxt_lib.todo_directory import TodoDirectory
 
 
 class TestParseIncompleteTask(unittest.TestCase):
@@ -158,7 +161,37 @@ class TestCompletionNotRecognised(unittest.TestCase):
         self.assertEqual(task.priority, Priority.A)
 
 
+class TestInvalidDates(unittest.TestCase):
+    def test_invalid_incomplete_leading_date_is_treated_as_plain_text(self) -> None:
+        task = parse_task("2026-99-99 broken import")
+
+        self.assertFalse(task.done)
+        self.assertIsNone(task.creation_date)
+        self.assertEqual(task.text, "2026-99-99 broken import")
+
+    def test_invalid_completed_leading_date_is_treated_as_plain_text(self) -> None:
+        task = parse_task("x 2026-99-99 broken import")
+
+        self.assertTrue(task.done)
+        self.assertIsNone(task.completion_date)
+        self.assertIsNone(task.creation_date)
+        self.assertEqual(task.text, "2026-99-99 broken import")
+
+    def test_invalid_second_completed_date_is_left_in_text(self) -> None:
+        task = parse_task("x 2024-01-01 2026-99-99 broken import")
+
+        self.assertTrue(task.done)
+        self.assertEqual(task.completion_date, date(2024, 1, 1))
+        self.assertIsNone(task.creation_date)
+        self.assertEqual(task.text, "2026-99-99 broken import")
+
+
 class TestSerializeTask(unittest.TestCase):
+    def test_parse_task_preserves_explicit_ref(self) -> None:
+        ref = TaskRef("task.txt", 1)
+        task = parse_task("Call Mom", ref=ref)
+        self.assertEqual(task.ref, ref)
+
     def test_round_trip_plain(self) -> None:
         line = "Post signs around the neighborhood +GarageSale"
         self.assertEqual(serialize_task(parse_task(line)), line)
@@ -188,18 +221,21 @@ class TestSerializeTask(unittest.TestCase):
         self.assertEqual(serialize_task(parse_task(line)), line)
 
     def test_completed_task_drops_priority(self) -> None:
-        from pathlib import Path
-
         from todotxt_lib.operations import complete_task
-        from todotxt_lib.todo_file import TodoFile
 
-        task = parse_task("(A) 2011-03-02 Call Mom")
-        f = TodoFile(Path("/dev/null"))
-        f.tasks = [task]
-        done_task = complete_task(f, task, date(2011, 3, 3))
-        serialized = serialize_task(done_task)
-        self.assertNotIn("(A)", serialized)
-        self.assertTrue(serialized.startswith("x "))
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir) / "todo.txt.d"
+            root.mkdir()
+            (root / "done.txt.d").mkdir()
+            (root / "task.txt").write_text("(A) 2011-03-02 Call Mom\n", encoding="utf-8")
+
+            store = TodoDirectory(root)
+            store.load()
+            done_task = complete_task(store, store.tasks[0], date(2011, 3, 3))
+
+            serialized = serialize_task(done_task)
+            self.assertNotIn("(A)", serialized)
+            self.assertTrue(serialized.startswith("x "))
 
 
 if __name__ == "__main__":

@@ -21,7 +21,7 @@ template $PreferencesDialog: Adw.Dialog {
         title: "Storage";
 
         Adw.ActionRow dir_row {
-          title: "Task folder";
+          title: "todo.txt.d directory";
           subtitle: "Not set";
 
           [suffix]
@@ -32,6 +32,12 @@ template $PreferencesDialog: Adw.Dialog {
             styles ["flat"]
           }
         }
+
+        Adw.SwitchRow auto_normalize_row {
+          title: "Auto-normalize multi-task files";
+          subtitle: "Split shared .txt files into one task per file before editing them";
+          notify::active => $on_auto_normalize_toggled();
+        }
       }
 
       Adw.PreferencesGroup {
@@ -39,7 +45,7 @@ template $PreferencesDialog: Adw.Dialog {
 
         Adw.SwitchRow raw_text_row {
           title: "Show raw text";
-          subtitle: "Display the full todo.txt line instead of cleaned text";
+          subtitle: "Display the full todo.txt-compatible task line instead of cleaned text";
           notify::active => $on_raw_text_toggled();
         }
       }

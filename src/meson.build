@@ -104,6 +104,7 @@ lib_sources = [
   'todotxt_lib/parser.py',
   'todotxt_lib/task.py',
   'todotxt_lib/text_editing.py',
+  'todotxt_lib/todo_directory.py',
   'todotxt_lib/todo_file.py',
 ]
 install_data(lib_sources, install_dir: libdir)

@@ -1,4 +1,4 @@
-"""Welcome dialog shown on first launch to pick a task folder."""
+"""Welcome dialog shown on first launch to pick a todo.txt.d root directory."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ from ._ui import RESOURCE_PREFIX
 
 @Gtk.Template(resource_path=f"{RESOURCE_PREFIX}/ui/welcome_dialog.ui")
 class WelcomeDialog(Adw.Dialog):
-    """First-start dialog that asks the user to choose a task folder."""
+    """First-start dialog that asks the user to choose a todo.txt.d root."""
 
     __gtype_name__ = "WelcomeDialog"
 
@@ -34,7 +34,7 @@ class WelcomeDialog(Adw.Dialog):
     @Gtk.Template.Callback()
     def on_choose_clicked(self, *_args: object) -> None:
         dialog = Gtk.FileDialog()
-        dialog.set_title("Choose Task Folder")
+        dialog.set_title("Choose todo.txt.d Directory")
         dialog.select_folder(
             self.get_root(),  # type: ignore[arg-type]
             None,

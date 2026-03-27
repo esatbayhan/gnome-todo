@@ -345,7 +345,7 @@ class TodoPanelIndicator extends PanelMenu.Button {
 
         if (!summary.configured) {
             this._showMessage(
-                this._extension.gettext('Choose your todo.txt folder in the Todo app first.'),
+                this._extension.gettext('Choose your todo.txt.d directory in the Todo app first.'),
                 'missing-config'
             );
             return;

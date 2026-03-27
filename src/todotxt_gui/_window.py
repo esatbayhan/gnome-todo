@@ -17,23 +17,24 @@ from todotxt_lib import (
     SelectionKind,
     SidebarSelection,
     Task,
-    TodoFile,
+    TodoDirectory,
+    TaskRef,
     add_tag_to_task,
     add_task_with_priority,
     all_contexts,
     all_projects,
     build_tag_list,
-    complete_task_by_raw,
+    complete_task_by_ref,
     compute_smart_filter_counts,
-    delete_task_by_raw,
-    find_task_by_raw,
+    delete_task_by_ref,
+    find_task_by_ref,
     group_tasks,
-    uncomplete_task_by_raw,
+    uncomplete_task_by_ref,
     update_task_from_detail,
 )
 
 from . import __version__
-from ._config import get_show_raw_text
+from ._config import get_auto_normalize_multi_task_files, get_show_raw_text
 from ._content import TaskSection
 from ._content_header import ContentHeader
 from ._detail_panel import TaskDetailPanel
@@ -80,12 +81,13 @@ class TodoWindow(Adw.ApplicationWindow):
     def __init__(
         self,
         application: Adw.Application,
-        todo_path: Path,
-        done_path: Path,
+        todo_dir: Path,
     ) -> None:
         super().__init__(application=application)
-        self._todo = TodoFile(todo_path)
-        self._done_file = TodoFile(done_path)
+        self._store = TodoDirectory(
+            todo_dir,
+            auto_normalize_multi_task_files=get_auto_normalize_multi_task_files(),
+        )
         self._add_dialog = AddTaskDialog()
         self._prefs_dialog = PreferencesDialog()
 
@@ -139,7 +141,7 @@ class TodoWindow(Adw.ApplicationWindow):
 
         # File monitoring for external changes (e.g. Syncthing)
         self._monitor = FileMonitor(
-            [self._todo.path, self._done_file.path],
+            [self._store.root_dir, self._store.done_dir],
             self._on_file_reload,
         )
 
@@ -170,20 +172,19 @@ class TodoWindow(Adw.ApplicationWindow):
 
     def _on_file_reload(self) -> None:
         """Reload data if files were modified externally."""
-        if self._todo.has_external_changes() or self._done_file.has_external_changes():
+        if self._store.has_external_changes():
             self._load()
             self._refresh_selected_task()
 
     # ── Data loading ────────────────────────────────────────────────────
 
     def _load(self) -> None:
-        self._todo.load()
-        self._done_file.load()
+        self._store.load()
         self._refresh_sidebar()
         self._refresh_content()
 
     def _all_tasks(self) -> list[Task]:
-        return list(self._todo.tasks) + list(self._done_file.tasks)
+        return list(self._store.tasks)
 
     # ── Reload helpers (sync-safety) ─────────────────────────────────
 
@@ -193,32 +194,34 @@ class TodoWindow(Adw.ApplicationWindow):
         Called before every mutating operation so that our save does not
         silently overwrite changes made by another device / program.
         """
-        changed = False
-        if self._todo.has_external_changes():
-            self._todo.load()
-            changed = True
-        if self._done_file.has_external_changes():
-            self._done_file.load()
-            changed = True
-        if changed and self._selected_task is not None:
-            raw = self._selected_task.raw
-            found = next((t for t in self._all_tasks() if t.raw == raw), None)
-            if found is not None:
-                self._selected_task = found
-            else:
-                self._selected_task = None
+        if self._store.has_external_changes():
+            self._store.load()
+            self._selected_task = self._resolve_task(self._selected_task)
 
     def _refresh_selected_task(self) -> None:
         """Re-select the open task after an external reload, or close panel."""
         if self._selected_task is None:
             return
-        located = find_task_by_raw(self._todo, self._done_file, self._selected_task.raw)
+        located = self._find_selected_task()
         if located is None:
             self._close_detail_panel()
             return
 
         self._selected_task = located.task
         self._sync_detail_panel()
+
+    def _find_selected_task(self) -> object | None:
+        if self._selected_task is None or self._selected_task.ref is None:
+            return None
+        resolved = self._resolve_task(self._selected_task)
+        if resolved is None or resolved.ref is None:
+            return None
+        return find_task_by_ref(self._store, resolved.ref)
+
+    def _resolve_task(self, task: Task | None) -> Task | None:
+        if task is None or task.ref is None:
+            return None
+        return self._store.find_task_fuzzy(task.ref, raw=task.raw)
 
     # ── Sidebar refresh ─────────────────────────────────────────────────
 
@@ -389,11 +392,12 @@ class TodoWindow(Adw.ApplicationWindow):
     # ── Task actions ────────────────────────────────────────────────────
 
     def _complete_task(self, task: Task) -> None:
+        if task.ref is None:
+            return
         self._reload_if_changed()
-        outcome = complete_task_by_raw(
-            self._todo,
-            self._done_file,
-            task.raw,
+        outcome = complete_task_by_ref(
+            self._store,
+            task.ref,
             completion_date=date.today(),
         )
         if outcome.status == "missing":
@@ -407,8 +411,10 @@ class TodoWindow(Adw.ApplicationWindow):
         )
 
     def _delete_task(self, task: Task) -> None:
+        if task.ref is None:
+            return
         self._reload_if_changed()
-        outcome = delete_task_by_raw(self._todo, self._done_file, task.raw)
+        outcome = delete_task_by_ref(self._store, task.ref)
         if outcome.status == "missing":
             self._close_detail_panel()
             self._refresh_sidebar()
@@ -425,16 +431,15 @@ class TodoWindow(Adw.ApplicationWindow):
 
     def _on_task_dropped_on_tag(
         self,
-        task_raw: str,
+        task_ref: TaskRef,
         tag_name: str,
         tag_kind: str,
     ) -> None:
         """Add a project or context to a task dropped on a sidebar tag."""
         self._reload_if_changed()
         outcome = add_tag_to_task(
-            self._todo,
-            self._done_file,
-            task_raw,
+            self._store,
+            task_ref,
             tag_name=tag_name,
             tag_kind=tag_kind,
         )
@@ -445,7 +450,7 @@ class TodoWindow(Adw.ApplicationWindow):
         self._apply_mutation_outcome(
             outcome,
             select_task=(
-                self._selected_task is not None and self._selected_task.raw == task_raw
+                self._selected_task is not None and self._selected_task.ref == task_ref
             ),
             toast_title=f"Added {prefix}{tag_name}",
         )
@@ -464,11 +469,12 @@ class TodoWindow(Adw.ApplicationWindow):
 
     def _on_detail_task_updated(self, old_task: Task, new_line: str) -> None:
         """Handle task update from the detail panel."""
+        if old_task.ref is None:
+            return
         self._reload_if_changed()
         outcome = update_task_from_detail(
-            self._todo,
-            self._done_file,
-            old_task.raw,
+            self._store,
+            old_task.ref,
             new_line,
         )
         if outcome.status == "missing":
@@ -488,8 +494,10 @@ class TodoWindow(Adw.ApplicationWindow):
         self._close_detail_panel()
 
     def _on_detail_task_uncompleted(self, task: Task) -> None:
+        if task.ref is None:
+            return
         self._reload_if_changed()
-        outcome = uncomplete_task_by_raw(self._todo, self._done_file, task.raw)
+        outcome = uncomplete_task_by_ref(self._store, task.ref)
         if outcome.status == "missing":
             self._close_detail_panel()
             self._refresh_sidebar()
@@ -589,7 +597,7 @@ class TodoWindow(Adw.ApplicationWindow):
                 return
             self._reload_if_changed()
             outcome = add_task_with_priority(
-                self._todo,
+                self._store,
                 result.text,
                 creation_date=date.today(),
                 priority=result.priority,
@@ -654,24 +662,30 @@ class TodoWindow(Adw.ApplicationWindow):
     # ── Preferences ────────────────────────────────────────────────────
 
     def _on_preferences(self, *_args: object) -> None:
-        current_dir = self._todo.path.parent
+        current_dir = self._store.root_dir
         self._prefs_dialog.open(
             self,
             current_dir,
             self._on_dir_changed,
+            on_auto_normalize_changed=self._on_auto_normalize_changed,
             on_raw_text_changed=self._on_raw_text_changed,
         )
+
+    def _on_auto_normalize_changed(self, value: bool) -> None:
+        self._store.auto_normalize_multi_task_files = value
 
     def _on_raw_text_changed(self, value: bool) -> None:
         self._show_raw_text = value
         self._refresh_content()
 
     def _on_dir_changed(self, new_dir: Path) -> None:
-        self._todo = TodoFile(new_dir / "todo.txt")
-        self._done_file = TodoFile(new_dir / "done.txt")
+        self._store = TodoDirectory(
+            new_dir,
+            auto_normalize_multi_task_files=get_auto_normalize_multi_task_files(),
+        )
         self._close_detail_panel()
         self._load()
-        self._monitor.update_paths([self._todo.path, self._done_file.path])
+        self._monitor.update_paths([self._store.root_dir, self._store.done_dir])
         self.toast_overlay.add_toast(Adw.Toast(title=f"Switched to {new_dir.name}"))
 
     def _sync_detail_panel(self) -> None:
@@ -694,20 +708,19 @@ class TodoWindow(Adw.ApplicationWindow):
         toast_title: str | None = None,
     ) -> None:
         """Persist changed files, refresh views, and update selection state."""
-        if outcome.save_todo:
-            self._todo.save()
-        if outcome.save_done:
-            self._done_file.save()
-
         if close_detail:
             self._close_detail_panel()
         elif select_task and outcome.task is not None:
             self._selected_task = outcome.task
+        else:
+            self._selected_task = self._resolve_task(self._selected_task)
+            if self._selected_task is None:
+                self._close_detail_panel()
 
         self._refresh_sidebar()
         self._refresh_content()
 
-        if select_task and not close_detail and self._selected_task is not None:
+        if not close_detail and self._selected_task is not None:
             self._sync_detail_panel()
 
         if toast_title is not None and outcome.changed:

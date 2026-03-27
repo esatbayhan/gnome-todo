@@ -1,4 +1,4 @@
-"""Tests for the GTK4 GUI application."""
+"""Tests for GUI path helpers and runtime metadata."""
 
 from __future__ import annotations
 
@@ -8,68 +8,48 @@ from pathlib import Path
 from unittest.mock import patch
 
 from todotxt_gui import __version__
-from todotxt_gui._core import done_file_path, sort_key, todo_file_path
+from todotxt_gui._core import has_configured_dir, sort_key, todo_dir_path
 from todotxt_lib import parse_task
 
 
 class TestVersionMetadata(unittest.TestCase):
     def test_runtime_version_matches_release(self) -> None:
-        self.assertEqual(__version__, "0.2.1")
+        self.assertEqual(__version__, "0.3.0")
 
 
-class TestFilePaths(unittest.TestCase):
+class TestDirectoryPaths(unittest.TestCase):
     @patch("todotxt_gui._core.get_todo_dir", return_value=None)
-    def test_default_todo_path(self, _mock: object) -> None:
-        skip = {"TODO_FILE", "TODO_DIR"}
-        env = {k: v for k, v in os.environ.items() if k not in skip}
+    def test_default_todo_dir_path(self, _mock: object) -> None:
+        env = {k: v for k, v in os.environ.items() if k != "TODO_DIR"}
         with patch.dict(os.environ, env, clear=True):
-            self.assertEqual(todo_file_path(), Path.home() / "todo.txt")
+            self.assertEqual(todo_dir_path(), Path.home() / "todo.txt.d")
 
-    def test_todo_file_env_overrides(self) -> None:
-        with patch.dict(os.environ, {"TODO_FILE": "/custom/my.txt"}, clear=False):
-            self.assertEqual(todo_file_path(), Path("/custom/my.txt"))
+    def test_todo_dir_env_overrides(self) -> None:
+        with patch.dict(os.environ, {"TODO_DIR": "/custom/todo.txt.d"}, clear=False):
+            self.assertEqual(todo_dir_path(), Path("/custom/todo.txt.d"))
 
-    @patch("todotxt_gui._core.get_todo_dir", return_value=None)
-    def test_todo_dir_env_fallback(self, _mock: object) -> None:
-        skip = {"TODO_FILE", "TODO_DIR"}
-        env = {k: v for k, v in os.environ.items() if k not in skip}
-        env["TODO_DIR"] = "/custom/dir"
+    @patch("todotxt_gui._core.get_todo_dir", return_value=Path("/saved/todo.txt.d"))
+    def test_config_dir_fallback(self, _mock: object) -> None:
+        env = {k: v for k, v in os.environ.items() if k != "TODO_DIR"}
         with patch.dict(os.environ, env, clear=True):
-            self.assertEqual(todo_file_path(), Path("/custom/dir/todo.txt"))
-
-    def test_todo_file_takes_priority_over_dir(self) -> None:
-        with patch.dict(
-            os.environ,
-            {"TODO_FILE": "/explicit/todo.txt", "TODO_DIR": "/dir"},
-            clear=False,
-        ):
-            self.assertEqual(todo_file_path(), Path("/explicit/todo.txt"))
+            self.assertEqual(todo_dir_path(), Path("/saved/todo.txt.d"))
 
     @patch("todotxt_gui._core.get_todo_dir", return_value=None)
-    def test_default_done_path(self, _mock: object) -> None:
-        env = {
-            k: v
-            for k, v in os.environ.items()
-            if k not in {"TODO_DONE_FILE", "TODO_DIR"}
-        }
+    def test_has_configured_dir_false_without_env_or_config(self, _mock: object) -> None:
+        env = {k: v for k, v in os.environ.items() if k != "TODO_DIR"}
         with patch.dict(os.environ, env, clear=True):
-            self.assertEqual(done_file_path(), Path.home() / "done.txt")
+            self.assertFalse(has_configured_dir())
 
-    def test_done_file_env_overrides(self) -> None:
-        env = {"TODO_DONE_FILE": "/custom/done.txt"}
-        with patch.dict(os.environ, env, clear=False):
-            self.assertEqual(done_file_path(), Path("/custom/done.txt"))
+    @patch("todotxt_gui._core.get_todo_dir", return_value=Path("/saved/todo.txt.d"))
+    def test_has_configured_dir_true_with_config(self, _mock: object) -> None:
+        env = {k: v for k, v in os.environ.items() if k != "TODO_DIR"}
+        with patch.dict(os.environ, env, clear=True):
+            self.assertTrue(has_configured_dir())
 
     @patch("todotxt_gui._core.get_todo_dir", return_value=None)
-    def test_done_dir_env_fallback(self, _mock: object) -> None:
-        env = {
-            k: v
-            for k, v in os.environ.items()
-            if k not in {"TODO_DONE_FILE", "TODO_DIR"}
-        }
-        env["TODO_DIR"] = "/custom/dir"
-        with patch.dict(os.environ, env, clear=True):
-            self.assertEqual(done_file_path(), Path("/custom/dir/done.txt"))
+    def test_has_configured_dir_true_with_env(self, _mock: object) -> None:
+        with patch.dict(os.environ, {"TODO_DIR": "/custom/todo.txt.d"}, clear=True):
+            self.assertTrue(has_configured_dir())
 
 
 class TestSortKey(unittest.TestCase):

@@ -1,7 +1,7 @@
 {
   "uuid": "gnome-todo-shell-ext@dev.bayhan",
   "name": "Todo Panel",
-  "description": "Quickly add todo.txt tasks from the GNOME top panel and glance at overdue or today-relevant tasks.",
+  "description": "Quickly add todo.txt.d tasks from the GNOME top panel and glance at overdue or today-relevant tasks.",
   "shell-version": ["49"],
   "url": "https://github.com/esatbayhan/gnome-todo"
 }
